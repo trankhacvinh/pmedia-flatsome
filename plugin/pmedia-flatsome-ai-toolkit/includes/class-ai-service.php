@@ -5,9 +5,18 @@ final class PMFAI_AI_Service
 {
     public static function generate_block(array $params)
     {
+        $started = microtime(true);
         $options = PMFAI_Settings::get_options();
         $api_key = trim((string)($options['api_key'] ?? ''));
         if ($api_key === '') {
+            PMFAI_Usage_Logger::log([
+                'action' => 'generate-block',
+                'status' => 'error',
+                'mode' => sanitize_key($params['costMode'] ?? 'balanced'),
+                'type' => sanitize_key($params['type'] ?? 'generate-from-description'),
+                'industry' => sanitize_text_field($params['industry'] ?? ''),
+                'error_message' => 'Missing API key',
+            ]);
             return new WP_Error('missing_api_key', 'Chưa cấu hình API key trong Settings.', ['status' => 400]);
         }
 
@@ -43,40 +52,103 @@ final class PMFAI_AI_Service
             'body' => wp_json_encode($payload),
         ]);
 
+        $duration_ms = (int)round((microtime(true) - $started) * 1000);
+
         if (is_wp_error($response)) {
+            PMFAI_Usage_Logger::log([
+                'action' => 'generate-block',
+                'status' => 'error',
+                'mode' => $cost_mode,
+                'model' => $mode_config['model'],
+                'type' => $type,
+                'industry' => sanitize_text_field($params['industry'] ?? ''),
+                'duration_ms' => $duration_ms,
+                'error_message' => $response->get_error_message(),
+            ]);
             return $response;
         }
 
         $code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $json = json_decode($body, true);
+        $usage = is_array($json['usage'] ?? null) ? $json['usage'] : [];
 
         if ($code < 200 || $code >= 300) {
             $message = $json['error']['message'] ?? ('AI API error HTTP ' . $code);
+            PMFAI_Usage_Logger::log([
+                'action' => 'generate-block',
+                'status' => 'error',
+                'mode' => $cost_mode,
+                'model' => $mode_config['model'],
+                'type' => $type,
+                'industry' => sanitize_text_field($params['industry'] ?? ''),
+                'duration_ms' => $duration_ms,
+                'http_code' => $code,
+                'usage' => $usage,
+                'error_message' => $message,
+            ]);
             return new WP_Error('api_error', $message, ['status' => 500]);
         }
 
         $content = $json['choices'][0]['message']['content'] ?? '';
         if (!$content) {
+            PMFAI_Usage_Logger::log([
+                'action' => 'generate-block',
+                'status' => 'error',
+                'mode' => $cost_mode,
+                'model' => $mode_config['model'],
+                'type' => $type,
+                'industry' => sanitize_text_field($params['industry'] ?? ''),
+                'duration_ms' => $duration_ms,
+                'http_code' => $code,
+                'usage' => $usage,
+                'error_message' => 'Empty AI response',
+            ]);
             return new WP_Error('empty_response', 'AI trả về rỗng hoặc không đúng định dạng.', ['status' => 500]);
         }
 
         $parsed = PMFAI_Code_Validator::parse_block($content);
         if (is_wp_error($parsed)) {
+            PMFAI_Usage_Logger::log([
+                'action' => 'generate-block',
+                'status' => 'error',
+                'mode' => $cost_mode,
+                'model' => $mode_config['model'],
+                'type' => $type,
+                'industry' => sanitize_text_field($params['industry'] ?? ''),
+                'duration_ms' => $duration_ms,
+                'http_code' => $code,
+                'usage' => $usage,
+                'error_message' => 'Parse failed: ' . $parsed->get_error_message(),
+            ]);
             return [
                 'raw' => $content,
                 'parse_error' => $parsed->get_error_message(),
                 'prompt' => $prompt,
                 'cost_mode' => $cost_mode,
                 'model' => $mode_config['model'],
+                'usage' => $usage,
             ];
         }
+
+        PMFAI_Usage_Logger::log([
+            'action' => 'generate-block',
+            'status' => 'success',
+            'mode' => $cost_mode,
+            'model' => $mode_config['model'],
+            'type' => $type,
+            'industry' => sanitize_text_field($params['industry'] ?? ''),
+            'duration_ms' => $duration_ms,
+            'http_code' => $code,
+            'usage' => $usage,
+        ]);
 
         $parsed['raw'] = $content;
         $parsed['prompt'] = $prompt;
         $parsed['source'] = 'auto-mode-' . $cost_mode;
         $parsed['cost_mode'] = $cost_mode;
         $parsed['model'] = $mode_config['model'];
+        $parsed['usage'] = $usage;
         return $parsed;
     }
 
