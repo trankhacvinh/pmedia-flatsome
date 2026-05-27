@@ -85,27 +85,35 @@ final class PMFAI_AI_Service
         $base_model = $options['api_model'] ?: 'gpt-4.1-mini';
         $base_temperature = is_numeric($options['temperature']) ? (float)$options['temperature'] : 0.4;
 
+        $fast_model = trim((string)($options['fast_model'] ?? '')) ?: $base_model;
+        $balanced_model = trim((string)($options['balanced_model'] ?? '')) ?: $base_model;
+        $high_model = trim((string)($options['high_model'] ?? '')) ?: $base_model;
+
+        $fast_temperature = is_numeric($options['fast_temperature'] ?? null) ? (float)$options['fast_temperature'] : min($base_temperature, 0.25);
+        $balanced_temperature = is_numeric($options['balanced_temperature'] ?? null) ? (float)$options['balanced_temperature'] : $base_temperature;
+        $high_temperature = is_numeric($options['high_temperature'] ?? null) ? (float)$options['high_temperature'] : max($base_temperature, 0.55);
+
         $configs = [
             'fast' => [
                 'label' => 'Fast / Cheap',
-                'model' => $base_model,
-                'temperature' => min($base_temperature, 0.25),
+                'model' => $fast_model,
+                'temperature' => $fast_temperature,
                 'timeout' => 60,
                 'system' => 'You generate concise, clean WordPress Flatsome-compatible HTML blocks. Return only the requested pmedia-flatsome-block JSON markdown block. Prefer existing pm-* classes and avoid custom CSS unless required.',
                 'instruction' => 'Ưu tiên tốc độ và tiết kiệm token. Tạo block đơn giản, ít CSS nhất có thể, không phân tích quá dài.',
             ],
             'balanced' => [
                 'label' => 'Balanced',
-                'model' => $base_model,
-                'temperature' => $base_temperature,
+                'model' => $balanced_model,
+                'temperature' => $balanced_temperature,
                 'timeout' => 90,
                 'system' => 'You generate clean WordPress Flatsome-compatible HTML blocks. Return only the requested pmedia-flatsome-block JSON markdown block.',
                 'instruction' => 'Cân bằng chất lượng và chi phí. Bố cục rõ ràng, responsive ổn, CSS custom tối thiểu.',
             ],
             'high' => [
                 'label' => 'High Quality',
-                'model' => $base_model,
-                'temperature' => max($base_temperature, 0.55),
+                'model' => $high_model,
+                'temperature' => $high_temperature,
                 'timeout' => 120,
                 'system' => 'You are a senior UI engineer specialized in WordPress Flatsome. Generate polished, production-ready, conversion-focused HTML blocks. Return only the requested pmedia-flatsome-block JSON markdown block.',
                 'instruction' => 'Ưu tiên chất lượng cao: bố cục thuyết phục, copywriting tự nhiên, spacing tốt, responsive rõ ràng, vẫn giữ CSS sạch và tương thích Flatsome.',
