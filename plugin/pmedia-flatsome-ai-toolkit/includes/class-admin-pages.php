@@ -64,10 +64,14 @@ final class PMFAI_Admin_Pages
         $options = PMFAI_Settings::get_options();
         echo '<div class="wrap pmfai-wrap">';
         self::header('Settings', 'API chỉ dùng cho Auto Mode. Bridge/Manual Mode không gọi API plugin.');
-        echo '<form method="post" action="options.php"><div class="pmfai-panel"><div class="pmfai-grid-2">';
+        echo '<form method="post" action="options.php"><div class="pmfai-panel"><h2>API mặc định</h2><div class="pmfai-grid-2">';
         settings_fields('pmfai_settings_group');
-        foreach (['api_endpoint'=>'API endpoint','api_key'=>'API key','api_model'=>'Model','temperature'=>'Temperature'] as $key => $label) {
+        foreach (['api_endpoint'=>'API endpoint','api_key'=>'API key','api_model'=>'Model mặc định','temperature'=>'Temperature mặc định'] as $key => $label) {
             self::field($key, $label, $key === 'api_key' ? 'password' : 'text');
+        }
+        echo '</div><h2>Model theo Cost / Quality Mode</h2><p class="description">Nếu để trống model của từng mode, plugin sẽ dùng Model mặc định ở trên.</p><div class="pmfai-grid-2">';
+        foreach (['fast_model'=>'Fast / Cheap model','fast_temperature'=>'Fast / Cheap temperature','balanced_model'=>'Balanced model','balanced_temperature'=>'Balanced temperature','high_model'=>'High Quality model','high_temperature'=>'High Quality temperature'] as $key => $label) {
+            self::field($key, $label);
         }
         echo '</div><label class="pmfai-field"><span>Rule bổ sung</span><textarea name="' . esc_attr(PMFAI_OPTION_KEY . '[extra_rules]') . '" rows="5">' . esc_textarea($options['extra_rules']) . '</textarea></label><p>';
         submit_button('Lưu Settings', 'primary', 'submit', false);
