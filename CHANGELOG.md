@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.0
+
+### Changed
+
+- Preview Sandbox now uses the active Design System tokens from plugin settings.
+- `PMFAI_Assets` exposes `tokens` and `tokensCss` to admin JavaScript.
+- Preview color, radius and spacing now reflect configured values instead of hard-coded defaults.
+
+### Notes
+
+- Preview still includes lightweight Flatsome class simulation for quick admin checks.
+- Final visual QA should still be done in the real Flatsome page/UX Builder.
+
 ## 1.5.0
 
 ### Added
