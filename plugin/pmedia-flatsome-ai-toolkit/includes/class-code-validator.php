@@ -5,22 +5,24 @@ final class PMFAI_Code_Validator
 {
     public static function parse_block(string $raw)
     {
-        $raw = wp_unslash($raw);
-        if (preg_match('/```pmedia-flatsome-block\s*(.*?)```/is', $raw, $matches)) {
-            $json = trim($matches[1]);
-        } elseif (preg_match('/```json\s*(.*?)```/is', $raw, $matches)) {
-            $json = trim($matches[1]);
-        } else {
-            $start = strpos($raw, '{');
-            $end = strrpos($raw, '}');
-            $json = ($start !== false && $end !== false && $end > $start) ? substr($raw, $start, $end - $start + 1) : '';
-        }
+        $raw = (string)$raw;
+        $json = self::extract_json($raw);
 
         if (!$json) {
             return new WP_Error('parse_failed', 'Không tìm thấy JSON pmedia-flatsome-block hợp lệ.', ['status' => 400]);
         }
 
         $data = json_decode($json, true);
+
+        // Backward-compatible fallback for form-encoded/manual pasted content.
+        // Important: do not wp_unslash before the first json_decode because it corrupts valid JSON strings containing escaped HTML quotes like class=\"...\".
+        if (!is_array($data)) {
+            $unslashed_json = self::extract_json(wp_unslash($raw));
+            if ($unslashed_json && $unslashed_json !== $json) {
+                $data = json_decode($unslashed_json, true);
+            }
+        }
+
         if (!is_array($data)) {
             return new WP_Error('json_invalid', 'JSON không hợp lệ: ' . json_last_error_msg(), ['status' => 400]);
         }
@@ -42,6 +44,20 @@ final class PMFAI_Code_Validator
             'suggestions' => $analysis['suggestions'],
             'scores' => $analysis['scores'],
         ];
+    }
+
+    private static function extract_json(string $raw): string
+    {
+        $raw = trim($raw);
+        if (preg_match('/```pmedia-flatsome-block\s*(.*?)```/is', $raw, $matches)) {
+            return trim($matches[1]);
+        }
+        if (preg_match('/```json\s*(.*?)```/is', $raw, $matches)) {
+            return trim($matches[1]);
+        }
+        $start = strpos($raw, '{');
+        $end = strrpos($raw, '}');
+        return ($start !== false && $end !== false && $end > $start) ? trim(substr($raw, $start, $end - $start + 1)) : '';
     }
 
     public static function analyze(string $html, string $css): array
