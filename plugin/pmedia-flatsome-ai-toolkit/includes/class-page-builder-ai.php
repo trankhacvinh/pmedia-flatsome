@@ -45,7 +45,13 @@ final class PMFAI_Page_Builder_AI
             . "- Nội dung tiếng Việt tự nhiên, chuyên nghiệp, không văn AI.\n"
             . "- Nếu build mode là single-section thì chỉ tạo 1 section.\n"
             . "- Nếu build mode là full-page thì tạo đủ các section cần thiết cho một trang hoàn chỉnh.\n\n"
-            . "Ví dụ JSON string đúng: {\"html\":\"<section class=\\\"pm-section pmedia-ai-block\\\">Nội dung</section>\",\"css\":\".pmedia-ai-block{padding:72px 24px}\"}\n\n"
+            . "Quy tắc giảm CSS lặp lại:\n"
+            . "- Design System token đã có sẵn, PHẢI dùng token chung thay vì tự khai báo biến màu trong từng section.\n"
+            . "- Không khai báo các biến kiểu --pm-navy, --pm-blue, --pm-text, --pm-muted, --pm-border, --pm-soft trong từng block.\n"
+            . "- Dùng các token có sẵn: var(--pm-color-primary), var(--pm-color-secondary), var(--pm-color-accent), var(--pm-color-text), var(--pm-color-muted), var(--pm-color-border), var(--pm-color-bg-soft), var(--pm-radius-md), var(--pm-radius-lg), var(--pm-shadow-sm), var(--pm-shadow-md).\n"
+            . "- Không lặp lại màu HEX nếu có thể dùng token chung.\n"
+            . "- CSS section chỉ viết layout/hiệu ứng riêng thật sự cần thiết. Nếu class pm-* đã đủ dùng thì css để chuỗi rỗng.\n\n"
+            . "Ví dụ JSON string đúng: {\"html\":\"<section class=\\\"pm-section pmedia-ai-block\\\">Nội dung</section>\",\"css\":\".pmedia-ai-block{padding:var(--pm-section-padding) 24px}\"}\n\n"
             . "Build mode: {$mode}\n"
             . "Brief:\n" . ($brief ?: '[Dán brief trang hoặc website tại đây]') . "\n\n"
             . "Schema bắt buộc:\n" . $schema;
@@ -66,7 +72,7 @@ final class PMFAI_Page_Builder_AI
             'model' => $mode_config['model'],
             'temperature' => $mode_config['temperature'],
             'messages' => [
-                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Return JSON only. Escape all double quotes inside HTML/CSS strings.'],
+                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Return JSON only. Escape all double quotes inside HTML/CSS strings. Reuse existing design tokens and avoid redeclaring per-section color variables.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
         ];
@@ -100,7 +106,6 @@ final class PMFAI_Page_Builder_AI
 
         $data = json_decode($raw, true);
 
-        // Fallback 1: WordPress/forms may add slashes. Only unslash after trying valid JSON first.
         if (!is_array($data)) {
             $unslashed = self::strip_code_fence(wp_unslash($raw));
             if ($unslashed !== $raw) {
@@ -108,7 +113,6 @@ final class PMFAI_Page_Builder_AI
             }
         }
 
-        // Fallback 2: tolerate common ChatGPT mistake where html/css contains raw double quotes.
         if (!is_array($data)) {
             $repaired = self::repair_unescaped_html_css_strings($raw);
             if ($repaired !== $raw) {
@@ -183,6 +187,13 @@ final class PMFAI_Page_Builder_AI
             if (stripos($html, 'pmedia-ai-block') === false) {
                 $html = '<div class="pmedia-ai-block pm-page-block pm-page-block-' . esc_attr($id) . '">' . "\n" . trim($html) . "\n" . '</div>';
             }
+
+            $normalized = self::normalize_section_css($css);
+            $css = $normalized['css'];
+            foreach ($normalized['warnings'] as $warning) {
+                $out['warnings'][] = "Section {$id}: " . $warning;
+            }
+
             $out['page']['sections'][] = [
                 'id' => $id,
                 'type' => $type,
@@ -198,6 +209,72 @@ final class PMFAI_Page_Builder_AI
             return new WP_Error('no_valid_sections', 'Không có section hợp lệ.', ['status' => 400]);
         }
         return $out;
+    }
+
+    private static function normalize_section_css(string $css): array
+    {
+        $warnings = [];
+        $css = trim($css);
+        if ($css === '') {
+            return ['css' => '', 'warnings' => []];
+        }
+
+        $original = $css;
+        $options = PMFAI_Settings::get_options();
+
+        $customVarMap = [
+            '--pm-navy' => 'var(--pm-color-secondary)',
+            '--pm-blue' => 'var(--pm-color-primary)',
+            '--pm-accent' => 'var(--pm-color-accent)',
+            '--pm-text' => 'var(--pm-color-text)',
+            '--pm-muted' => 'var(--pm-color-muted)',
+            '--pm-border' => 'var(--pm-color-border)',
+            '--pm-soft' => 'var(--pm-color-bg-soft)',
+        ];
+
+        foreach ($customVarMap as $varName => $token) {
+            $css = preg_replace('/' . preg_quote($varName, '/') . '\s*:\s*[^;{}]+;?/i', '', $css);
+            $css = str_ireplace('var(' . $varName . ')', $token, $css);
+        }
+
+        $colorMap = [
+            '#062B63' => 'var(--pm-color-secondary)',
+            '#0B4EA2' => 'var(--pm-color-primary)',
+            '#2F80ED' => 'var(--pm-color-accent)',
+            '#102033' => 'var(--pm-color-text)',
+            '#64748B' => 'var(--pm-color-muted)',
+            '#DDE6F2' => 'var(--pm-color-border)',
+            '#F5F8FC' => 'var(--pm-color-bg-soft)',
+            '#FFFFFF' => '#fff',
+        ];
+
+        $settingsColorMap = [
+            $options['primary_color'] ?? '' => 'var(--pm-color-primary)',
+            $options['secondary_color'] ?? '' => 'var(--pm-color-secondary)',
+            $options['accent_color'] ?? '' => 'var(--pm-color-accent)',
+            $options['text_color'] ?? '' => 'var(--pm-color-text)',
+            $options['muted_color'] ?? '' => 'var(--pm-color-muted)',
+            $options['border_color'] ?? '' => 'var(--pm-color-border)',
+            $options['bg_soft_color'] ?? '' => 'var(--pm-color-bg-soft)',
+        ];
+
+        foreach (array_merge($colorMap, $settingsColorMap) as $hex => $token) {
+            if ($hex && $token) {
+                $css = str_ireplace($hex, $token, $css);
+            }
+        }
+
+        $css = preg_replace('/;{2,}/', ';', $css);
+        $css = preg_replace('/\{\s*;/', '{', $css);
+        $css = preg_replace('/\s+/', ' ', $css);
+        $css = preg_replace('/\s*([{}:;,>])\s*/', '$1', $css);
+        $css = trim($css);
+
+        if ($css !== $original) {
+            $warnings[] = 'Đã normalize CSS: xóa token cục bộ và thay màu lặp bằng Design System variables.';
+        }
+
+        return ['css' => $css, 'warnings' => $warnings];
     }
 
     public static function to_shortcode(array $page): string
