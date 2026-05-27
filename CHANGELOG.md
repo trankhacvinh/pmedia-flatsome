@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.8.0
+
+### Added
+
+- Auto Mode / Generate Block thật sự trong admin.
+- New class `PMFAI_AI_Service` to call the configured AI API endpoint.
+- New admin menu **Generate Block**.
+- New REST endpoint `POST /wp-json/pmedia-ai/v1/generate-block`.
+- Generate workflow now uses: prompt builder → AI API → pmedia-flatsome-block parser → validator → preview → save to Library.
+- Shows raw AI response and parse error when the model does not return the expected format.
+- Generated blocks can be saved directly to Block Library.
+
+### Notes
+
+- Requires API key in Settings.
+- Bridge Mode and Manual Mode still work without plugin API calls.
+
 ## 1.7.0
 
 ### Added
