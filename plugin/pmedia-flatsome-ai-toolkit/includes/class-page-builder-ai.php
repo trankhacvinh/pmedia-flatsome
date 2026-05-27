@@ -35,6 +35,9 @@ final class PMFAI_Page_Builder_AI
             . "Output sẽ được plugin ghép thành Flatsome shortcode dạng [section] + [row] + [col] + HTML block.\n\n"
             . "Yêu cầu bắt buộc:\n"
             . "- Trả về duy nhất JSON hợp lệ, không markdown, không giải thích.\n"
+            . "- HTML và CSS phải nằm trong JSON string hợp lệ.\n"
+            . "- Bắt buộc escape toàn bộ dấu nháy kép bên trong HTML/CSS: dùng \\\" thay cho \".\n"
+            . "- Dòng mới trong HTML/CSS phải dùng \\n, không được xuống dòng thô trong string.\n"
             . "- Mỗi section có html và css riêng.\n"
             . "- HTML phải dùng class pm-* và pmedia-ai-block, không Bootstrap/Tailwind.\n"
             . "- CSS phải scoped trong .pmedia-ai-block hoặc class section riêng.\n"
@@ -42,6 +45,7 @@ final class PMFAI_Page_Builder_AI
             . "- Nội dung tiếng Việt tự nhiên, chuyên nghiệp, không văn AI.\n"
             . "- Nếu build mode là single-section thì chỉ tạo 1 section.\n"
             . "- Nếu build mode là full-page thì tạo đủ các section cần thiết cho một trang hoàn chỉnh.\n\n"
+            . "Ví dụ JSON string đúng: {\"html\":\"<section class=\\\"pm-section pmedia-ai-block\\\">Nội dung</section>\",\"css\":\".pmedia-ai-block{padding:72px 24px}\"}\n\n"
             . "Build mode: {$mode}\n"
             . "Brief:\n" . ($brief ?: '[Dán brief trang hoặc website tại đây]') . "\n\n"
             . "Schema bắt buộc:\n" . $schema;
@@ -62,7 +66,7 @@ final class PMFAI_Page_Builder_AI
             'model' => $mode_config['model'],
             'temperature' => $mode_config['temperature'],
             'messages' => [
-                ['role' => 'system', 'content' => 'You generate strict JSON page structures for WordPress Flatsome. Return valid JSON only.'],
+                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Return JSON only. Escape all double quotes inside HTML/CSS strings.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
         ];
@@ -92,17 +96,57 @@ final class PMFAI_Page_Builder_AI
 
     public static function parse_json(string $raw, array $extra = [])
     {
-        $raw = trim(wp_unslash($raw));
-        $raw = preg_replace('/^```(?:json)?\s*/i', '', $raw);
-        $raw = preg_replace('/\s*```$/', '', $raw);
+        $raw = self::strip_code_fence((string)$raw);
+
         $data = json_decode($raw, true);
+
+        // Fallback 1: WordPress/forms may add slashes. Only unslash after trying valid JSON first.
         if (!is_array($data)) {
-            return new WP_Error('invalid_json', 'JSON page không hợp lệ.', ['status' => 400]);
+            $unslashed = self::strip_code_fence(wp_unslash($raw));
+            if ($unslashed !== $raw) {
+                $data = json_decode($unslashed, true);
+            }
         }
+
+        // Fallback 2: tolerate common ChatGPT mistake where html/css contains raw double quotes.
+        if (!is_array($data)) {
+            $repaired = self::repair_unescaped_html_css_strings($raw);
+            if ($repaired !== $raw) {
+                $data = json_decode($repaired, true);
+            }
+        }
+
+        if (!is_array($data)) {
+            return new WP_Error('invalid_json', 'JSON page không hợp lệ: ' . json_last_error_msg() . '. Gợi ý: HTML/CSS trong JSON phải escape dấu nháy kép, ví dụ class=\\"pm-section\\".', ['status' => 400]);
+        }
+
         $validated = self::validate($data);
         if (is_wp_error($validated)) { return $validated; }
         $validated['shortcode'] = self::to_shortcode($validated['page']);
         return array_merge($validated, $extra);
+    }
+
+    private static function strip_code_fence(string $raw): string
+    {
+        $raw = trim($raw);
+        $raw = preg_replace('/^```(?:json)?\s*/i', '', $raw);
+        $raw = preg_replace('/\s*```$/', '', $raw);
+        return trim($raw);
+    }
+
+    private static function repair_unescaped_html_css_strings(string $raw): string
+    {
+        $raw = self::strip_code_fence($raw);
+
+        $raw = preg_replace_callback('/"html"\s*:\s*"([\s\S]*?)"\s*,\s*"css"\s*:/', function ($m) {
+            return '"html":' . wp_json_encode($m[1], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ',"css":';
+        }, $raw);
+
+        $raw = preg_replace_callback('/"css"\s*:\s*"([\s\S]*?)"\s*(?=\}\s*(?:,|\]))/', function ($m) {
+            return '"css":' . wp_json_encode($m[1], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }, $raw);
+
+        return $raw;
     }
 
     public static function validate(array $data)
