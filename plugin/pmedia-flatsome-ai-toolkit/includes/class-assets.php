@@ -14,6 +14,8 @@ final class PMFAI_Assets
         wp_localize_script('pmfai-admin', 'PMFAI', [
             'restUrl' => esc_url_raw(rest_url('pmedia-ai/v1')),
             'nonce' => wp_create_nonce('wp_rest'),
+            'tokens' => self::tokens_array(),
+            'tokensCss' => self::tokens_css(),
         ]);
     }
 
@@ -26,6 +28,25 @@ final class PMFAI_Assets
 
         wp_enqueue_style('pmfai-frontend', PMFAI_URL . 'assets/css/frontend.css', [], PMFAI_VERSION);
         wp_add_inline_style('pmfai-frontend', self::tokens_css());
+    }
+
+    public static function tokens_array(): array
+    {
+        $o = PMFAI_Settings::get_options();
+        return [
+            'primaryColor' => $o['primary_color'],
+            'secondaryColor' => $o['secondary_color'],
+            'accentColor' => $o['accent_color'],
+            'textColor' => $o['text_color'],
+            'mutedColor' => $o['muted_color'],
+            'borderColor' => $o['border_color'],
+            'bgSoftColor' => $o['bg_soft_color'],
+            'radiusSm' => $o['radius_sm'],
+            'radiusMd' => $o['radius_md'],
+            'radiusLg' => $o['radius_lg'],
+            'sectionPaddingDesktop' => $o['section_padding_desktop'],
+            'sectionPaddingMobile' => $o['section_padding_mobile'],
+        ];
     }
 
     public static function tokens_css(): string
