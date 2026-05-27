@@ -81,8 +81,8 @@ final class PMFAI_Admin_Pages
 
     public static function validate_code(): void
     {
-        echo '<div class="wrap pmfai-wrap">'; self::header('Clean / Validate Code', 'Kiểm tra CSS global, selector nguy hiểm và độ tương thích Flatsome.');
-        echo '<div class="pmfai-panel"><div class="pmfai-grid-2"><label class="pmfai-field"><span>HTML</span><textarea id="pmfai-clean-html" rows="14"></textarea></label><label class="pmfai-field"><span>CSS</span><textarea id="pmfai-clean-css" rows="14"></textarea></label></div><p><button class="button button-primary" id="pmfai-validate-code">Validate</button></p><div id="pmfai-clean-result"></div></div></div>';
+        echo '<div class="wrap pmfai-wrap">'; self::header('Clean / Validate Code', 'Kiểm tra và tự sửa CSS global, selector nguy hiểm, độ tương thích Flatsome.');
+        echo '<div class="pmfai-panel"><div class="pmfai-grid-2"><label class="pmfai-field"><span>HTML</span><textarea id="pmfai-clean-html" rows="14"></textarea></label><label class="pmfai-field"><span>CSS</span><textarea id="pmfai-clean-css" rows="14"></textarea></label></div><p><button class="button" id="pmfai-validate-code">Validate</button> <button class="button button-primary" id="pmfai-auto-fix-code">Auto Fix</button></p><div id="pmfai-clean-result"></div></div></div>';
     }
 
     public static function block_library(): void
