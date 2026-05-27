@@ -42,6 +42,7 @@ document.addEventListener('click', async function (e) {
     try {
       const j = await pmfaiFetch('/generate-block', 'POST', {
         type: document.getElementById('pmfai-generate-type').value,
+        costMode: document.getElementById('pmfai-generate-cost-mode').value,
         industry: document.getElementById('pmfai-generate-industry').value,
         style: document.getElementById('pmfai-generate-style').value,
         goal: document.getElementById('pmfai-generate-goal').value,
@@ -252,6 +253,7 @@ function renderPmfaiResult(j, canSave, withPreview) {
   if (j.code && j.message) return '<div class="notice notice-error"><p>' + pmfaiEsc(j.message) + '</p></div>';
   let h = '<div class="pmfai-result">';
   if (j.title) h += '<h2>' + pmfaiEsc(j.title) + '</h2>';
+  if (j.cost_mode || j.model) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
   if (j.scores) h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
   if (j.parse_error) h += '<div class="notice notice-warning"><p>AI trả về chưa parse được: ' + pmfaiEsc(j.parse_error) + '</p></div>';
   if (j.changes && j.changes.length) h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
