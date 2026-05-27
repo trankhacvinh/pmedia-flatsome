@@ -60,6 +60,19 @@ document.addEventListener('click', async function (e) {
     document.getElementById('pmfai-clean-result').innerHTML = renderPmfaiResult(j, false);
   }
 
+  if (t.id === 'pmfai-auto-fix-code') {
+    e.preventDefault();
+    const j = await pmfaiFetch('/auto-fix-code', 'POST', {
+      html: document.getElementById('pmfai-clean-html').value,
+      css: document.getElementById('pmfai-clean-css').value
+    });
+    if (!j.code) {
+      document.getElementById('pmfai-clean-html').value = j.html || '';
+      document.getElementById('pmfai-clean-css').value = j.css || '';
+    }
+    document.getElementById('pmfai-clean-result').innerHTML = renderPmfaiResult(j, false);
+  }
+
   if (t.id === 'pmfai-load-library') {
     e.preventDefault();
     await loadPmfaiLibrary();
@@ -131,6 +144,9 @@ function renderPmfaiResult(j, canSave) {
   if (j.title) h += '<h2>' + pmfaiEsc(j.title) + '</h2>';
   if (j.scores) {
     h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
+  }
+  if (j.changes && j.changes.length) {
+    h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
   }
   if (j.warnings && j.warnings.length) {
     h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
