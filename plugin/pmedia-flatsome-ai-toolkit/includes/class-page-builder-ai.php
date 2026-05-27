@@ -36,8 +36,8 @@ final class PMFAI_Page_Builder_AI
             . "Yêu cầu bắt buộc:\n"
             . "- Trả về duy nhất JSON hợp lệ, không markdown, không giải thích.\n"
             . "- HTML và CSS phải nằm trong JSON string hợp lệ.\n"
-            . "- Bắt buộc escape toàn bộ dấu nháy kép bên trong HTML/CSS: dùng \\\" thay cho \".\n"
-            . "- Dòng mới trong HTML/CSS phải dùng \\n, không được xuống dòng thô trong string.\n"
+            . "- Escape dấu nháy kép bên trong HTML/CSS đúng một lần: dùng \\\" thay cho dấu nháy kép thô.\n"
+            . "- Không double-escape HTML/CSS. Không trả về chuỗi có \\\\n hoặc \\\\\\\" còn hiện ra thành chữ trong preview.\n"
             . "- Mỗi section có html và css riêng.\n"
             . "- HTML phải dùng class pm-* và pmedia-ai-block, không Bootstrap/Tailwind.\n"
             . "- CSS phải scoped trong .pmedia-ai-block hoặc class section riêng.\n"
@@ -72,7 +72,7 @@ final class PMFAI_Page_Builder_AI
             'model' => $mode_config['model'],
             'temperature' => $mode_config['temperature'],
             'messages' => [
-                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Return JSON only. Escape all double quotes inside HTML/CSS strings. Reuse existing design tokens and avoid redeclaring per-section color variables.'],
+                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Return JSON only. Escape all double quotes inside HTML/CSS strings exactly once. Do not double-escape newline or quote characters. Reuse existing design tokens and avoid redeclaring per-section color variables.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
         ];
@@ -153,6 +153,26 @@ final class PMFAI_Page_Builder_AI
         return $raw;
     }
 
+    private static function normalize_code_string(string $value): array
+    {
+        $original = $value;
+        $value = trim($value);
+
+        // Some AI responses double-escape JSON strings, leaving visible \n or \" in the decoded value.
+        $value = str_replace(["\\r\\n", "\\n", "\\t"], ["\n", "\n", "\t"], $value);
+        $value = str_replace(['\\"', "\\'", '\\/'], ['"', "'", '/'], $value);
+
+        // If the whole value was accidentally JSON-encoded as a string again, decode it once.
+        if ((str_starts_with($value, '"') && str_ends_with($value, '"')) || (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
+            $maybe = json_decode($value, true);
+            if (is_string($maybe)) {
+                $value = $maybe;
+            }
+        }
+
+        return ['value' => $value, 'changed' => $value !== $original];
+    }
+
     public static function validate(array $data)
     {
         $page = $data['page'] ?? $data;
@@ -178,8 +198,15 @@ final class PMFAI_Page_Builder_AI
         foreach ($sections as $index => $section) {
             $id = sanitize_html_class($section['id'] ?? ('section-' . ($index + 1)));
             $type = sanitize_key($section['type'] ?? 'custom');
-            $html = (string)($section['html'] ?? '');
-            $css = (string)($section['css'] ?? '');
+            $htmlNormalized = self::normalize_code_string((string)($section['html'] ?? ''));
+            $cssNormalized = self::normalize_code_string((string)($section['css'] ?? ''));
+            $html = $htmlNormalized['value'];
+            $css = $cssNormalized['value'];
+
+            if ($htmlNormalized['changed'] || $cssNormalized['changed']) {
+                $out['warnings'][] = "Section {$id}: Đã tự sửa chuỗi HTML/CSS bị double-escaped, ví dụ \\n hoặc \\\" còn hiện ra trong preview.";
+            }
+
             if (trim($html) === '') {
                 $out['warnings'][] = "Section {$id} thiếu HTML và đã bị bỏ qua.";
                 continue;
