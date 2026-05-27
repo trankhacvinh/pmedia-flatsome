@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.0
+
+### Added
+
+- Per-mode AI model and temperature settings.
+- New Settings fields:
+  - Fast / Cheap model
+  - Fast / Cheap temperature
+  - Balanced model
+  - Balanced temperature
+  - High Quality model
+  - High Quality temperature
+- `PMFAI_AI_Service` now prioritizes per-mode model/temperature settings.
+- If a mode-specific model is empty, the plugin falls back to the default model.
+
+### Notes
+
+- This version gives better cost control for Auto Mode.
+- Recommended setup: cheaper model for Fast, default model for Balanced, stronger model for High Quality.
+
 ## 1.9.0
 
 ### Added
