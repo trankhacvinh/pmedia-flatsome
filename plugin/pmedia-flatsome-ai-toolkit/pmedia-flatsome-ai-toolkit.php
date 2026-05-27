@@ -3,7 +3,7 @@
  * Plugin Name: Pmedia Flatsome AI Toolkit
  * Plugin URI: https://pmedia.vn
  * Description: Design System, ChatGPT Bridge, Import/Validate block và CSS Toolkit cho Flatsome.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: Pmedia
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PMFAI_VERSION', '1.4.0');
+define('PMFAI_VERSION', '1.5.0');
 define('PMFAI_FILE', __FILE__);
 define('PMFAI_DIR', plugin_dir_path(__FILE__));
 define('PMFAI_URL', plugin_dir_url(__FILE__));
