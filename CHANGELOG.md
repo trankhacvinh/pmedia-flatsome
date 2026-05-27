@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.0
+
+### Changed
+
+- Refactor plugin từ single-file sang multi-file structure.
+- Tách code thành các class riêng:
+  - `PMFAI_Settings`
+  - `PMFAI_Post_Types`
+  - `PMFAI_Prompt_Builder`
+  - `PMFAI_Code_Validator`
+  - `PMFAI_Assets`
+  - `PMFAI_REST_API`
+  - `PMFAI_Admin_Pages`
+  - `PMFAI_Plugin`
+- Tách CSS/JS admin và frontend ra thư mục `assets/`.
+- Giữ nguyên workflow và hành vi chính của bản 1.1.0.
+
+### Validation
+
+- Đã chạy `php -l` local cho main plugin file và toàn bộ file PHP trong `includes/`, không có lỗi syntax.
+
 ## 1.1.0
 
 ### Added
