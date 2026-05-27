@@ -11,6 +11,7 @@ final class PMFAI_Admin_Pages
         add_submenu_page('pmedia-ai-builder', 'ChatGPT Bridge', 'ChatGPT Bridge', 'manage_options', 'pmfai-chatgpt-bridge', [__CLASS__, 'chatgpt_bridge']);
         add_submenu_page('pmedia-ai-builder', 'Import From ChatGPT', 'Import From ChatGPT', 'manage_options', 'pmfai-import-chatgpt', [__CLASS__, 'import_chatgpt']);
         add_submenu_page('pmedia-ai-builder', 'Clean / Validate Code', 'Clean / Validate Code', 'manage_options', 'pmfai-clean-code', [__CLASS__, 'validate_code']);
+        add_submenu_page('pmedia-ai-builder', 'Block Library', 'Block Library', 'manage_options', 'pmfai-block-library', [__CLASS__, 'block_library']);
         add_submenu_page('pmedia-ai-builder', 'Prompt Library', 'Prompt Library', 'manage_options', 'pmfai-prompt-library', [__CLASS__, 'prompt_library']);
         add_submenu_page('pmedia-ai-builder', 'Settings', 'Settings', 'manage_options', 'pmfai-settings', [__CLASS__, 'settings']);
     }
@@ -30,7 +31,7 @@ final class PMFAI_Admin_Pages
         echo '<div class="pmfai-card"><h3>Auto Mode</h3><p>Plugin gọi AI API trực tiếp. Phù hợp block đơn giản.</p></div>';
         echo '<div class="pmfai-card"><h3>Bridge Mode</h3><p>Plugin tạo prompt, ChatGPT xử lý ảnh/mô tả, paste kết quả về plugin.</p></div>';
         echo '<div class="pmfai-card"><h3>Manual Mode</h3><p>ChatGPT sinh code, plugin kiểm tra CSS Safety và Flatsome Compatibility.</p></div>';
-        echo '</div></div><div class="pmfai-panel"><h2>Quy trình với ảnh mẫu</h2><ol><li>Vào ChatGPT Bridge.</li><li>Copy prompt sang ChatGPT và đính kèm ảnh.</li><li>Yêu cầu output dạng <code>pmedia-flatsome-block</code>.</li><li>Paste vào Import From ChatGPT để parse/validate.</li><li>Copy HTML vào Flatsome HTML Block.</li></ol></div></div>';
+        echo '</div></div><div class="pmfai-panel"><h2>Quy trình với ảnh mẫu</h2><ol><li>Vào ChatGPT Bridge.</li><li>Copy prompt sang ChatGPT và đính kèm ảnh.</li><li>Yêu cầu output dạng <code>pmedia-flatsome-block</code>.</li><li>Paste vào Import From ChatGPT để parse/validate.</li><li>Lưu vào Block Library hoặc copy HTML vào Flatsome HTML Block.</li></ol></div></div>';
     }
 
     public static function design_system(): void
@@ -74,7 +75,7 @@ final class PMFAI_Admin_Pages
 
     public static function import_chatgpt(): void
     {
-        echo '<div class="wrap pmfai-wrap">'; self::header('Import From ChatGPT', 'Paste block pmedia-flatsome-block để parse, validate và copy code.');
+        echo '<div class="wrap pmfai-wrap">'; self::header('Import From ChatGPT', 'Paste block pmedia-flatsome-block để parse, validate, lưu Library và copy code.');
         echo '<div class="pmfai-panel"><label class="pmfai-field"><span>Kết quả từ ChatGPT</span><textarea id="pmfai-import-raw" rows="14"></textarea></label><p><button class="button button-primary" id="pmfai-parse-chatgpt">Parse + Validate</button></p><div id="pmfai-import-result"></div></div></div>';
     }
 
@@ -82,6 +83,12 @@ final class PMFAI_Admin_Pages
     {
         echo '<div class="wrap pmfai-wrap">'; self::header('Clean / Validate Code', 'Kiểm tra CSS global, selector nguy hiểm và độ tương thích Flatsome.');
         echo '<div class="pmfai-panel"><div class="pmfai-grid-2"><label class="pmfai-field"><span>HTML</span><textarea id="pmfai-clean-html" rows="14"></textarea></label><label class="pmfai-field"><span>CSS</span><textarea id="pmfai-clean-css" rows="14"></textarea></label></div><p><button class="button button-primary" id="pmfai-validate-code">Validate</button></p><div id="pmfai-clean-result"></div></div></div>';
+    }
+
+    public static function block_library(): void
+    {
+        echo '<div class="wrap pmfai-wrap">'; self::header('Block Library', 'Kho block đã import/generate để tái sử dụng cho Flatsome.');
+        echo '<div class="pmfai-panel"><div class="pmfai-toolbar"><input id="pmfai-library-search" placeholder="Tìm theo tên block..."> <select id="pmfai-library-type"><option value="">Tất cả loại</option><option value="hero">Hero</option><option value="service">Service</option><option value="pricing">Pricing</option><option value="faq">FAQ</option><option value="cta">CTA</option><option value="custom">Custom</option></select> <button class="button button-primary" id="pmfai-load-library">Tải danh sách</button></div><div id="pmfai-library-result"></div></div></div>';
     }
 
     public static function prompt_library(): void
