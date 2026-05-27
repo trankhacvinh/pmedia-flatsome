@@ -10,6 +10,7 @@ final class PMFAI_REST_API
         register_rest_route('pmedia-ai/v1', '/parse-chatgpt-block', ['methods' => 'POST', 'callback' => [__CLASS__, 'parse_chatgpt_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/validate-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'validate_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/auto-fix-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'auto_fix_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/usage-logs', ['methods' => 'GET', 'callback' => [__CLASS__, 'usage_logs'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/blocks', ['methods' => 'GET', 'callback' => [__CLASS__, 'list_blocks'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/blocks', ['methods' => 'POST', 'callback' => [__CLASS__, 'save_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/blocks/import', ['methods' => 'POST', 'callback' => [__CLASS__, 'import_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
@@ -52,6 +53,16 @@ final class PMFAI_REST_API
     public static function auto_fix_code(WP_REST_Request $request)
     {
         return rest_ensure_response(PMFAI_Code_Auto_Fixer::fix($request->get_param('html') ?: '', $request->get_param('css') ?: ''));
+    }
+
+    public static function usage_logs(WP_REST_Request $request)
+    {
+        return rest_ensure_response(PMFAI_Usage_Logger::list([
+            'posts_per_page' => $request->get_param('per_page') ?: 50,
+            'paged' => $request->get_param('page') ?: 1,
+            'status' => $request->get_param('status') ?: '',
+            'mode' => $request->get_param('mode') ?: '',
+        ]));
     }
 
     public static function list_blocks(WP_REST_Request $request)
