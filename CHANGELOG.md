@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.9.0
+
+### Added
+
+- Cost / Quality Mode for Auto Mode Generate Block.
+- New Generate Block selector:
+  - Fast / Cheap
+  - Balanced
+  - High Quality
+- `PMFAI_AI_Service` now adjusts temperature, timeout, system instruction and prompt instruction by mode.
+- Generate result now displays selected mode and model.
+
+### Notes
+
+- All modes currently use the model configured in Settings.
+- Future versions can add separate model settings per mode if needed.
+
 ## 1.8.0
 
 ### Added
