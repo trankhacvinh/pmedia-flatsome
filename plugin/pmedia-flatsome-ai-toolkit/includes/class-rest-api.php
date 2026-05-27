@@ -8,6 +8,7 @@ final class PMFAI_REST_API
         register_rest_route('pmedia-ai/v1', '/bridge-prompt', ['methods' => 'POST', 'callback' => [__CLASS__, 'bridge_prompt'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/parse-chatgpt-block', ['methods' => 'POST', 'callback' => [__CLASS__, 'parse_chatgpt_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/validate-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'validate_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/auto-fix-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'auto_fix_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/blocks', ['methods' => 'GET', 'callback' => [__CLASS__, 'list_blocks'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/blocks', ['methods' => 'POST', 'callback' => [__CLASS__, 'save_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/blocks/(?P<id>\d+)', ['methods' => 'GET', 'callback' => [__CLASS__, 'get_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
@@ -34,6 +35,11 @@ final class PMFAI_REST_API
     public static function validate_code(WP_REST_Request $request)
     {
         return rest_ensure_response(PMFAI_Code_Validator::analyze($request->get_param('html') ?: '', $request->get_param('css') ?: ''));
+    }
+
+    public static function auto_fix_code(WP_REST_Request $request)
+    {
+        return rest_ensure_response(PMFAI_Code_Auto_Fixer::fix($request->get_param('html') ?: '', $request->get_param('css') ?: ''));
     }
 
     public static function list_blocks(WP_REST_Request $request)
