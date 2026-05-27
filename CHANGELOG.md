@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- Usage Log / Cost Tracking foundation.
+- New `PMFAI_Usage_Logger` class.
+- New custom post type `pmedia_ai_usage` for AI usage records.
+- Generate Block now logs:
+  - user
+  - status
+  - mode
+  - model
+  - block type
+  - industry
+  - duration
+  - HTTP code
+  - prompt tokens
+  - completion tokens
+  - total tokens
+  - error message when failed
+- New REST endpoint `GET /wp-json/pmedia-ai/v1/usage-logs`.
+- New admin page **Usage Logs**.
+- Usage summary cards and detailed usage table in admin.
+
+### Notes
+
+- Token fields depend on whether the AI API response includes a `usage` object.
+- This is usage tracking foundation; price estimation per model can be added next.
+
 ## 2.0.0
 
 ### Added
