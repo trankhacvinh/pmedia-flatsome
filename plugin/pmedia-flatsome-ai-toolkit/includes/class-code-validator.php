@@ -1,0 +1,109 @@
+<?php
+if (!defined('ABSPATH')) { exit; }
+
+final class PMFAI_Code_Validator
+{
+    public static function parse_block(string $raw)
+    {
+        $raw = wp_unslash($raw);
+        if (preg_match('/```pmedia-flatsome-block\s*(.*?)```/is', $raw, $matches)) {
+            $json = trim($matches[1]);
+        } elseif (preg_match('/```json\s*(.*?)```/is', $raw, $matches)) {
+            $json = trim($matches[1]);
+        } else {
+            $start = strpos($raw, '{');
+            $end = strrpos($raw, '}');
+            $json = ($start !== false && $end !== false && $end > $start) ? substr($raw, $start, $end - $start + 1) : '';
+        }
+
+        if (!$json) {
+            return new WP_Error('parse_failed', 'Không tìm thấy JSON pmedia-flatsome-block hợp lệ.', ['status' => 400]);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            return new WP_Error('json_invalid', 'JSON không hợp lệ: ' . json_last_error_msg(), ['status' => 400]);
+        }
+
+        $html = (string)($data['html'] ?? '');
+        $css = (string)($data['css'] ?? '');
+        $analysis = self::analyze($html, $css);
+
+        return [
+            'title' => sanitize_text_field($data['title'] ?? 'Imported ChatGPT Block'),
+            'type' => sanitize_key($data['type'] ?? 'custom'),
+            'style' => sanitize_text_field($data['style'] ?? 'business'),
+            'description' => sanitize_textarea_field($data['description'] ?? ''),
+            'html' => $html,
+            'css' => $css,
+            'js' => (string)($data['js'] ?? ''),
+            'notes' => $data['notes'] ?? [],
+            'warnings' => $analysis['warnings'],
+            'suggestions' => $analysis['suggestions'],
+            'scores' => $analysis['scores'],
+        ];
+    }
+
+    public static function analyze(string $html, string $css): array
+    {
+        $warnings = [];
+        $suggestions = [];
+        $cssPenalty = 0;
+        $flatsomePenalty = 0;
+        $forbidden = ['body', 'html', '*', 'a', 'img', 'h1', 'h2', 'h3', '.container', '.row', '.col', '.button', '.section', '.card', '.title', '.box'];
+
+        foreach ($forbidden as $selector) {
+            if (preg_match('/(^|\}|,)\s*' . preg_quote($selector, '/') . '\s*(\{|,|:|\.)/m', $css)) {
+                $warnings[] = 'CSS selector nguy hiểm hoặc quá chung: ' . $selector;
+                $cssPenalty += 8;
+                $flatsomePenalty += 6;
+            }
+        }
+
+        if (preg_match_all('/!important/i', $css, $matches) && count($matches[0]) > 0) {
+            $warnings[] = 'Có ' . count($matches[0]) . ' lần dùng !important.';
+            $cssPenalty += min(20, count($matches[0]) * 3);
+        }
+
+        if (preg_match('/z-index\s*:\s*(9999|99999|999999)/i', $css)) {
+            $warnings[] = 'Có z-index quá cao.';
+            $cssPenalty += 8;
+        }
+
+        if (preg_match('/(^|\s)(body|html)\b/i', $html)) {
+            $warnings[] = 'HTML có body/html tag.';
+            $flatsomePenalty += 15;
+        }
+
+        if (!preg_match('/pmedia-ai-block/i', $html . $css)) {
+            $warnings[] = 'Thiếu wrapper .pmedia-ai-block.';
+            $cssPenalty += 10;
+            $flatsomePenalty += 8;
+            $suggestions[] = 'Bọc HTML trong <section class="pm-section pmedia-ai-block">.';
+        }
+
+        if (!preg_match('/\bpm-[a-z0-9-]+/i', $html . $css)) {
+            $warnings[] = 'Chưa thấy class chuẩn pm-*.';
+            $flatsomePenalty += 10;
+            $suggestions[] = 'Dùng pm-section, pm-card, pm-lead, pm-eyebrow hoặc pm-cta-box.';
+        }
+
+        if (preg_match_all('/#[0-9a-f]{3,8}\b/i', $css, $hex) && count($hex[0]) > 0) {
+            $warnings[] = 'Có ' . count($hex[0]) . ' màu hex trong CSS. Nên dùng CSS variables.';
+            $flatsomePenalty += min(12, count($hex[0]) * 2);
+        }
+
+        if (!$warnings) {
+            $suggestions[] = 'Code tương đối sạch. Vẫn nên test responsive trực tiếp trong Flatsome.';
+        }
+
+        return [
+            'warnings' => $warnings,
+            'suggestions' => $suggestions,
+            'scores' => [
+                'css_safety' => max(0, 100 - $cssPenalty),
+                'flatsome_compatibility' => max(0, 100 - $flatsomePenalty),
+            ],
+        ];
+    }
+}
