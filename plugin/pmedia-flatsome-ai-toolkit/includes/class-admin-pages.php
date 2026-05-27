@@ -8,6 +8,7 @@ final class PMFAI_Admin_Pages
         add_menu_page('Pmedia AI Builder', 'Pmedia AI Builder', 'manage_options', 'pmedia-ai-builder', [__CLASS__, 'dashboard'], 'dashicons-art', 58);
         add_submenu_page('pmedia-ai-builder', 'Dashboard', 'Dashboard', 'manage_options', 'pmedia-ai-builder', [__CLASS__, 'dashboard']);
         add_submenu_page('pmedia-ai-builder', 'Design System', 'Design System', 'manage_options', 'pmfai-design-system', [__CLASS__, 'design_system']);
+        add_submenu_page('pmedia-ai-builder', 'Generate Block', 'Generate Block', 'manage_options', 'pmfai-generate-block', [__CLASS__, 'generate_block']);
         add_submenu_page('pmedia-ai-builder', 'ChatGPT Bridge', 'ChatGPT Bridge', 'manage_options', 'pmfai-chatgpt-bridge', [__CLASS__, 'chatgpt_bridge']);
         add_submenu_page('pmedia-ai-builder', 'Import From ChatGPT', 'Import From ChatGPT', 'manage_options', 'pmfai-import-chatgpt', [__CLASS__, 'import_chatgpt']);
         add_submenu_page('pmedia-ai-builder', 'Clean / Validate Code', 'Clean / Validate Code', 'manage_options', 'pmfai-clean-code', [__CLASS__, 'validate_code']);
@@ -47,6 +48,15 @@ final class PMFAI_Admin_Pages
         echo '</div><label class="pmfai-check"><input type="checkbox" name="' . esc_attr(PMFAI_OPTION_KEY . '[enable_frontend_css]') . '" value="1" ' . checked($options['enable_frontend_css'], '1', false) . '> Bật CSS Toolkit ở frontend</label><p>';
         submit_button('Lưu Design System', 'primary', 'submit', false);
         echo '</p></div></form></div>';
+    }
+
+    public static function generate_block(): void
+    {
+        echo '<div class="wrap pmfai-wrap">';
+        self::header('Generate Block', 'Auto Mode: plugin gọi AI API trực tiếp, sau đó parse, validate, preview và lưu Library.');
+        echo '<div class="pmfai-panel"><div class="pmfai-grid-2"><label class="pmfai-field"><span>Loại yêu cầu</span><select id="pmfai-generate-type">';
+        foreach (PMFAI_Prompt_Builder::types() as $key => $label) { echo '<option value="' . esc_attr($key) . '">' . esc_html($label) . '</option>'; }
+        echo '</select></label><label class="pmfai-field"><span>Ngành nghề</span><input id="pmfai-generate-industry" value="doanh nghiệp dịch vụ"></label><label class="pmfai-field"><span>Phong cách</span><input id="pmfai-generate-style" value="hiện đại, chuyên nghiệp"></label><label class="pmfai-field"><span>Mục tiêu</span><input id="pmfai-generate-goal" value="Tạo HTML Block copy vào Flatsome"></label></div><label class="pmfai-field"><span>Nội dung / mô tả block</span><textarea id="pmfai-generate-content" rows="7" placeholder="Ví dụ: Tạo section hero giới thiệu dịch vụ thiết kế website cho doanh nghiệp, có headline, mô tả, 3 lợi ích, CTA..."></textarea></label><p><button class="button button-primary" id="pmfai-generate-block">Generate Block</button></p><div id="pmfai-generate-result"></div></div></div>';
     }
 
     public static function settings(): void
