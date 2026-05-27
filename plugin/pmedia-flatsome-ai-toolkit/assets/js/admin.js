@@ -22,6 +22,16 @@ document.addEventListener('click', async function (e) {
     setTimeout(() => t.textContent = old || 'Copy', 1200);
   }
 
+  if (t.classList.contains('pmfai-preview-size')) {
+    e.preventDefault();
+    const wrap = t.closest('.pmfai-preview-wrap');
+    if (wrap) {
+      wrap.dataset.size = t.dataset.size || 'desktop';
+      wrap.querySelectorAll('.pmfai-preview-size').forEach(btn => btn.classList.remove('button-primary'));
+      t.classList.add('button-primary');
+    }
+  }
+
   if (t.id === 'pmfai-build-prompt') {
     e.preventDefault();
     const body = {
@@ -39,7 +49,8 @@ document.addEventListener('click', async function (e) {
     e.preventDefault();
     const j = await pmfaiFetch('/parse-chatgpt-block', 'POST', {raw: document.getElementById('pmfai-import-raw').value});
     pmfaiLastParsedBlock = j.code ? null : j;
-    document.getElementById('pmfai-import-result').innerHTML = renderPmfaiResult(j, true);
+    document.getElementById('pmfai-import-result').innerHTML = renderPmfaiResult(j, true, true);
+    renderAllPreviewIframes();
   }
 
   if (t.id === 'pmfai-save-imported-block') {
@@ -57,7 +68,10 @@ document.addEventListener('click', async function (e) {
       html: document.getElementById('pmfai-clean-html').value,
       css: document.getElementById('pmfai-clean-css').value
     });
-    document.getElementById('pmfai-clean-result').innerHTML = renderPmfaiResult(j, false);
+    j.html = document.getElementById('pmfai-clean-html').value;
+    j.css = document.getElementById('pmfai-clean-css').value;
+    document.getElementById('pmfai-clean-result').innerHTML = renderPmfaiResult(j, false, true);
+    renderAllPreviewIframes();
   }
 
   if (t.id === 'pmfai-auto-fix-code') {
@@ -70,7 +84,8 @@ document.addEventListener('click', async function (e) {
       document.getElementById('pmfai-clean-html').value = j.html || '';
       document.getElementById('pmfai-clean-css').value = j.css || '';
     }
-    document.getElementById('pmfai-clean-result').innerHTML = renderPmfaiResult(j, false);
+    document.getElementById('pmfai-clean-result').innerHTML = renderPmfaiResult(j, false, true);
+    renderAllPreviewIframes();
   }
 
   if (t.id === 'pmfai-load-library') {
@@ -81,7 +96,8 @@ document.addEventListener('click', async function (e) {
   if (t.classList.contains('pmfai-view-block')) {
     e.preventDefault();
     const block = await pmfaiFetch('/blocks/' + t.dataset.id, 'GET');
-    document.getElementById('pmfai-library-detail').innerHTML = renderPmfaiResult(block, false) + '<p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.html || '') + '">Copy HTML</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.css || '') + '">Copy CSS</button></p>';
+    document.getElementById('pmfai-library-detail').innerHTML = renderPmfaiResult(block, false, true) + '<p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.html || '') + '">Copy HTML</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.css || '') + '">Copy CSS</button></p>';
+    renderAllPreviewIframes();
   }
 
   if (t.classList.contains('pmfai-delete-block')) {
@@ -135,7 +151,7 @@ function pmfaiAttr(s) {
   return pmfaiEsc(s).replace(/"/g, '&quot;');
 }
 
-function renderPmfaiResult(j, canSave) {
+function renderPmfaiResult(j, canSave, withPreview) {
   if (j.code && j.message) {
     return '<div class="notice notice-error"><p>' + pmfaiEsc(j.message) + '</p></div>';
   }
@@ -157,6 +173,9 @@ function renderPmfaiResult(j, canSave) {
   if (canSave && j.html) {
     h += '<p><button class="button button-primary" id="pmfai-save-imported-block">Save to Library</button></p>';
   }
+  if (withPreview && j.html) {
+    h += renderPreviewBox(j.html || '', j.css || '');
+  }
   if (j.html) {
     h += '<h3>HTML</h3><pre>' + pmfaiEsc(j.html) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.html) + '">Copy HTML</button></p>';
   }
@@ -164,4 +183,31 @@ function renderPmfaiResult(j, canSave) {
     h += '<h3>CSS</h3><pre>' + pmfaiEsc(j.css) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.css) + '">Copy CSS</button></p>';
   }
   return h + '</div>';
+}
+
+function renderPreviewBox(html, css) {
+  return '<div class="pmfai-preview-wrap" data-size="desktop">' +
+    '<div class="pmfai-preview-toolbar"><strong>Preview Sandbox</strong><span>' +
+    '<button class="button button-primary pmfai-preview-size" data-size="desktop">Desktop</button> ' +
+    '<button class="button pmfai-preview-size" data-size="tablet">Tablet</button> ' +
+    '<button class="button pmfai-preview-size" data-size="mobile">Mobile</button>' +
+    '</span></div>' +
+    '<iframe class="pmfai-preview-frame" data-html="' + pmfaiAttr(html) + '" data-css="' + pmfaiAttr(css || '') + '" sandbox="allow-same-origin"></iframe>' +
+    '</div>';
+}
+
+function renderAllPreviewIframes() {
+  document.querySelectorAll('.pmfai-preview-frame').forEach(frame => {
+    const html = frame.dataset.html || '';
+    const css = frame.dataset.css || '';
+    frame.srcdoc = buildPreviewDocument(html, css);
+  });
+}
+
+function buildPreviewDocument(html, css) {
+  const baseCss = `
+    :root{--pm-color-primary:#e31e24;--pm-color-secondary:#111827;--pm-color-accent:#f59e0b;--pm-color-text:#1f2937;--pm-color-muted:#6b7280;--pm-color-border:#e5e7eb;--pm-color-bg-soft:#f9fafb;--pm-radius-sm:8px;--pm-radius-md:16px;--pm-radius-lg:24px;--pm-section-padding:72px;--pm-section-padding-mobile:42px;--pm-shadow-sm:0 4px 16px rgba(15,23,42,.08);--pm-shadow-md:0 14px 36px rgba(15,23,42,.12)}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--pm-color-text);background:#fff}.row{display:flex;flex-wrap:wrap;gap:24px;max-width:1180px;margin:0 auto}.col{box-sizing:border-box;flex:1 1 0}.col-inner{width:100%}.small-12{flex-basis:100%}.medium-6,.large-6{flex-basis:calc(50% - 12px)}.button{display:inline-flex;align-items:center;justify-content:center;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700}.button.primary{background:var(--pm-color-primary);color:#fff}.pm-section{padding:var(--pm-section-padding) 20px}.pm-section-soft{background:var(--pm-color-bg-soft)}.pm-section-title{text-align:center;max-width:780px;margin:0 auto 36px}.pm-eyebrow{display:inline-block;color:var(--pm-color-primary);font-weight:800;text-transform:uppercase;font-size:13px;letter-spacing:.08em;margin-bottom:10px}.pm-lead{font-size:18px;line-height:1.7;color:var(--pm-color-muted)}.pm-card,.pm-cta-box,.pm-pricing-card,.pm-step{background:#fff;border:1px solid var(--pm-color-border);border-radius:var(--pm-radius-md);box-shadow:var(--pm-shadow-sm);padding:24px}.pm-hero-split,.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{display:grid;gap:24px}.pm-hero-split{grid-template-columns:1.05fr .95fr;align-items:center}.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{grid-template-columns:repeat(3,1fr)}.pm-feature-list{margin:0;padding:0;list-style:none}.pm-feature-list li{margin:0 0 10px;padding-left:24px;position:relative}.pm-feature-list li:before{content:"✓";position:absolute;left:0;color:var(--pm-color-primary);font-weight:900}@media(max-width:849px){.pm-section{padding:var(--pm-section-padding-mobile) 16px}.pm-hero-split,.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{grid-template-columns:1fr}.medium-6,.large-6{flex-basis:100%}}
+  `;
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + baseCss + '\n' + css + '</style></head><body>' + html + '</body></html>';
 }
