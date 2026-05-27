@@ -32,6 +32,30 @@ document.addEventListener('click', async function (e) {
     }
   }
 
+  if (t.id === 'pmfai-generate-block') {
+    e.preventDefault();
+    const result = document.getElementById('pmfai-generate-result');
+    t.disabled = true;
+    const oldText = t.textContent;
+    t.textContent = 'Đang generate...';
+    result.innerHTML = '<div class="notice notice-info"><p>Đang gọi AI API. Vui lòng không tắt trang.</p></div>';
+    try {
+      const j = await pmfaiFetch('/generate-block', 'POST', {
+        type: document.getElementById('pmfai-generate-type').value,
+        industry: document.getElementById('pmfai-generate-industry').value,
+        style: document.getElementById('pmfai-generate-style').value,
+        goal: document.getElementById('pmfai-generate-goal').value,
+        content: document.getElementById('pmfai-generate-content').value
+      });
+      pmfaiLastParsedBlock = j.code ? null : j;
+      result.innerHTML = renderPmfaiResult(j, true, true);
+      renderAllPreviewIframes();
+    } finally {
+      t.disabled = false;
+      t.textContent = oldText;
+    }
+  }
+
   if (t.id === 'pmfai-build-prompt') {
     e.preventDefault();
     const body = {
@@ -56,7 +80,7 @@ document.addEventListener('click', async function (e) {
   if (t.id === 'pmfai-save-imported-block') {
     e.preventDefault();
     if (!pmfaiLastParsedBlock) return;
-    const saved = await pmfaiFetch('/blocks', 'POST', Object.assign({}, pmfaiLastParsedBlock, {source: 'chatgpt-bridge'}));
+    const saved = await pmfaiFetch('/blocks', 'POST', Object.assign({}, pmfaiLastParsedBlock, {source: pmfaiLastParsedBlock.source || 'chatgpt-bridge'}));
     if (saved.id) alert('Đã lưu block #' + saved.id + ' vào Library.');
   }
 
@@ -229,6 +253,7 @@ function renderPmfaiResult(j, canSave, withPreview) {
   let h = '<div class="pmfai-result">';
   if (j.title) h += '<h2>' + pmfaiEsc(j.title) + '</h2>';
   if (j.scores) h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
+  if (j.parse_error) h += '<div class="notice notice-warning"><p>AI trả về chưa parse được: ' + pmfaiEsc(j.parse_error) + '</p></div>';
   if (j.changes && j.changes.length) h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
   if (j.warnings && j.warnings.length) h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
   if (j.suggestions && j.suggestions.length) h += '<h3>Gợi ý</h3><ul>' + j.suggestions.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
@@ -236,6 +261,8 @@ function renderPmfaiResult(j, canSave, withPreview) {
   if (withPreview && j.html) h += renderPreviewBox(j.html || '', j.css || '');
   if (j.html) h += '<h3>HTML</h3><pre>' + pmfaiEsc(j.html) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.html) + '">Copy HTML</button></p>';
   if (j.css) h += '<h3>CSS</h3><pre>' + pmfaiEsc(j.css) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.css) + '">Copy CSS</button></p>';
+  if (j.raw && !j.html) h += '<h3>Raw AI Response</h3><pre>' + pmfaiEsc(j.raw) + '</pre>';
+  if (j.prompt) h += '<details><summary>Prompt đã gửi</summary><pre>' + pmfaiEsc(j.prompt) + '</pre></details>';
   return h + '</div>';
 }
 
