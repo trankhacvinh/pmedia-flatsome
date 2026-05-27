@@ -17,6 +17,7 @@ final class PMFAI_Assets
             'tokens' => self::tokens_array(),
             'tokensCss' => self::tokens_css(),
         ]);
+        wp_enqueue_script('pmfai-page-builder-output-mode', PMFAI_URL . 'assets/js/page-builder-output-mode.js', ['pmfai-admin'], PMFAI_VERSION, true);
     }
 
     public static function frontend(): void
