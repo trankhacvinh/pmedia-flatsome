@@ -1,0 +1,30 @@
+name: Build WordPress Plugin ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugin/**'
+      - '.github/workflows/build-plugin.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare build directory
+        run: |
+          mkdir -p build
+          cd plugin
+          zip -r ../build/pmedia-flatsome-ai-toolkit.zip pmedia-flatsome-ai-toolkit -x '*.DS_Store' '*/.git/*'
+
+      - name: Upload plugin zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmedia-flatsome-ai-toolkit
+          path: build/pmedia-flatsome-ai-toolkit.zip
