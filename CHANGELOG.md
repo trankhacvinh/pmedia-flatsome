@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+
+- Auto Fix CSS/HTML cơ bản trong màn hình **Clean / Validate Code**.
+- Class `PMFAI_Code_Auto_Fixer`.
+- REST endpoint `POST /wp-json/pmedia-ai/v1/auto-fix-code`.
+- Nút **Auto Fix** trong admin.
+- Tự thêm wrapper `.pmedia-ai-block` nếu thiếu.
+- Tự xóa document tags như `html`, `head`, `body`, `meta`, `title`.
+- Tự xóa một số global reset selectors nguy hiểm.
+- Tự đổi class chung như `.card`, `.title`, `.badge`, `.cta` sang class `pm-*`.
+- Tự scope CSS selector vào `.pmedia-ai-block` ở mức cơ bản.
+- Tự thay màu hex khớp Design System sang CSS variables.
+- Tự xóa `!important`.
+
+### Notes
+
+- Auto Fix hiện là rule-based, không gọi AI API.
+- Cần test thực tế với nhiều block khác nhau trước khi dùng trên site production.
+
 ## 1.3.0
 
 ### Added
