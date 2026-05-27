@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- Preview Sandbox trong admin bằng `iframe srcdoc`.
+- Preview tự hiển thị sau khi:
+  - Import From ChatGPT thành công.
+  - Validate code.
+  - Auto Fix code.
+  - Xem chi tiết block trong Block Library.
+- Chế độ xem:
+  - Desktop
+  - Tablet
+  - Mobile
+- CSS preview được render trong iframe riêng để không ảnh hưởng giao diện WordPress Admin.
+- Preview có CSS mô phỏng tối thiểu các class Flatsome và `pm-*`.
+
+### Notes
+
+- Preview chỉ là sandbox mô phỏng nhanh, chưa thay thế việc kiểm tra thật trong Flatsome/UX Builder.
+- CSS token trong preview đang dùng default fallback; bản sau có thể đưa token từ Design System hiện tại vào JS.
+
 ## 1.4.0
 
 ### Added
