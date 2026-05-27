@@ -1,6 +1,7 @@
 let pmfaiLastParsedBlock = null;
 let pmfaiLastDesignSystem = null;
 let pmfaiLastPage = null;
+let pmfaiLastCreatedDraftId = null;
 
 document.addEventListener('click', async function (e) {
   const t = e.target;
@@ -55,13 +56,14 @@ document.addEventListener('click', async function (e) {
     if (!data) {
       try { data = JSON.parse(val('pmfai-ds-json')); } catch (err) { alert('JSON không hợp lệ: ' + err.message); return; }
     }
-    const r = await pmfaiFetch('/design-system/apply', 'POST', data);
-    if (r.applied) {
-      alert('Đã apply Design System vào Settings. Refresh trang để thấy token mới trong toàn bộ admin preview.');
-      html('pmfai-ds-result', renderDesignSystemResult(r));
-    } else {
-      html('pmfai-ds-result', renderDesignSystemResult(r));
-    }
+    await withLoading(t, 'Đang apply...', async () => {
+      const r = await pmfaiFetch('/design-system/apply', 'POST', data);
+      if (r.applied) {
+        html('pmfai-ds-result', '<div class="pmfai-status-box is-success">Đã apply Design System vào Settings. Refresh trang để admin preview nhận token mới nhất.</div>' + renderDesignSystemResult(r));
+      } else {
+        html('pmfai-ds-result', renderDesignSystemResult(r));
+      }
+    });
   }
 
   if (t.id === 'pmfai-page-bridge') {
@@ -72,6 +74,7 @@ document.addEventListener('click', async function (e) {
 
   if (t.id === 'pmfai-page-generate') {
     e.preventDefault();
+    pmfaiLastCreatedDraftId = null;
     await withLoading(t, 'Đang generate...', async () => {
       const j = await pmfaiFetch('/page-builder/generate', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), costMode: val('pmfai-page-cost-mode')});
       pmfaiLastPage = j.code ? null : j;
@@ -83,6 +86,7 @@ document.addEventListener('click', async function (e) {
 
   if (t.id === 'pmfai-page-import') {
     e.preventDefault();
+    pmfaiLastCreatedDraftId = null;
     const j = await pmfaiFetch('/page-builder/import', 'POST', {raw: val('pmfai-page-json')});
     pmfaiLastPage = j.code ? null : j;
     html('pmfai-page-result', renderPageResult(j));
@@ -91,16 +95,25 @@ document.addEventListener('click', async function (e) {
 
   if (t.id === 'pmfai-page-create-draft') {
     e.preventDefault();
+    if (pmfaiLastCreatedDraftId) {
+      html('pmfai-page-notice', '<div class="pmfai-status-box is-success">Page Draft đã được tạo rồi (#' + pmfaiLastCreatedDraftId + '). Để tạo bản mới, hãy Generate hoặc Validate lại trước.</div>');
+      return;
+    }
     let data = pmfaiLastPage;
     if (!data) {
       try { data = JSON.parse(val('pmfai-page-json')); } catch (err) { alert('JSON không hợp lệ: ' + err.message); return; }
     }
-    const r = await pmfaiFetch('/page-builder/create-draft', 'POST', data);
-    if (r.created) {
-      html('pmfai-page-result', (html('pmfai-page-result') || '') + '<div class="notice notice-success"><p>Đã tạo Page Draft #' + r.post_id + '. <a href="' + pmfaiAttr(r.edit_url || '#') + '" target="_blank">Mở trang chỉnh sửa</a></p></div>');
-    } else {
-      html('pmfai-page-result', renderError(r));
-    }
+    await withLoading(t, 'Đang tạo draft...', async () => {
+      const r = await pmfaiFetch('/page-builder/create-draft', 'POST', data);
+      if (r.created) {
+        pmfaiLastCreatedDraftId = r.post_id;
+        t.classList.add('is-disabled');
+        const notice = '<div class="pmfai-status-box is-success"><strong>Đã tạo Page Draft #' + r.post_id + ' thành công.</strong><div class="pmfai-created-page-actions"><a class="button button-primary" href="' + pmfaiAttr(r.edit_url || '#') + '" target="_blank">Mở trang chỉnh sửa</a><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(r.shortcode || '') + '">Copy Shortcode</button></div></div>';
+        html('pmfai-page-notice', notice);
+      } else {
+        html('pmfai-page-notice', renderError(r));
+      }
+    });
   }
 
   if (t.id === 'pmfai-generate-block') {
@@ -181,6 +194,7 @@ document.addEventListener('click', async function (e) {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
+  enhanceColorFields();
   if (document.getElementById('pmfai-library-result')) loadPmfaiLibrary();
   if (document.getElementById('pmfai-usage-result')) loadPmfaiUsageLogs();
 });
@@ -190,6 +204,30 @@ function setVal(id, v) { const el = document.getElementById(id); if (el) el.valu
 function html(id, v) { const el = document.getElementById(id); if (!el) return ''; if (typeof v !== 'undefined') el.innerHTML = v; return el.innerHTML; }
 function copyText(text, btn) { navigator.clipboard.writeText(text || ''); if (btn) { const old = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = old || 'Copy', 1200); } }
 async function withLoading(btn, text, fn) { btn.disabled = true; const old = btn.textContent; btn.textContent = text; try { await fn(); } finally { btn.disabled = false; btn.textContent = old; } }
+
+function enhanceColorFields() {
+  const colorNames = ['primary_color','secondary_color','accent_color','text_color','muted_color','border_color','bg_soft_color'];
+  document.querySelectorAll('.pmfai-field input[name]').forEach(input => {
+    const name = input.getAttribute('name') || '';
+    const key = colorNames.find(k => name.indexOf('[' + k + ']') !== -1);
+    if (!key || input.closest('.pmfai-color-field')) return;
+    const label = input.closest('.pmfai-field');
+    if (!label) return;
+    label.classList.add('pmfai-color-field');
+    const picker = document.createElement('input');
+    picker.type = 'color';
+    picker.className = 'pmfai-color-input-native';
+    picker.value = isHexColor(input.value) ? input.value : '#ffffff';
+    input.parentNode.appendChild(picker);
+    const swatch = document.createElement('span');
+    swatch.className = 'pmfai-color-swatch';
+    swatch.style.background = isHexColor(input.value) ? input.value : '#ffffff';
+    picker.parentNode.insertBefore(swatch, picker);
+    input.addEventListener('input', () => { if (isHexColor(input.value)) { picker.value = input.value; swatch.style.background = input.value; } });
+    picker.addEventListener('input', () => { input.value = picker.value.toUpperCase(); swatch.style.background = picker.value; });
+  });
+}
+function isHexColor(v) { return /^#[0-9a-f]{6}$/i.test(String(v || '').trim()); }
 
 async function pmfaiFetch(path, method, body) {
   const opts = {method: method || 'GET', headers: {'X-WP-Nonce': PMFAI.nonce}};
@@ -231,7 +269,7 @@ function renderDesignSystemResult(j) {
 function renderPageResult(j) {
   if (j.code && j.message) return renderError(j);
   const page = j.page || {};
-  let h = '<div class="pmfai-result"><h2>' + pmfaiEsc(page.title || 'Generated Page') + '</h2><p>' + pmfaiEsc(page.description || '') + '</p>';
+  let h = '<div id="pmfai-page-notice"></div><div class="pmfai-result"><h2>' + pmfaiEsc(page.title || 'Generated Page') + '</h2><p>' + pmfaiEsc(page.description || '') + '</p>';
   if (j.cost_mode || j.model) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
   if (j.warnings && j.warnings.length) h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
   (page.sections || []).forEach(s => { h += '<div class="pmfai-page-section-preview"><h3>' + pmfaiEsc(s.title || s.id || 'Section') + '</h3><p>' + pmfaiEsc(s.goal || '') + '</p>' + renderPreviewBox(s.html || '', s.css || '') + '</div>'; });
@@ -248,7 +286,7 @@ function renderLibraryDetail(block) {
 }
 
 function editField(id, label, value) { return '<label class="pmfai-field"><span>' + pmfaiEsc(label) + '</span><input id="' + id + '" value="' + pmfaiAttr(value) + '"></label>'; }
-function renderError(j) { return '<div class="notice notice-error"><p>' + pmfaiEsc(j.message || j.code || 'Có lỗi xảy ra.') + '</p></div>'; }
+function renderError(j) { return '<div class="pmfai-status-box is-error">' + pmfaiEsc(j.message || j.code || 'Có lỗi xảy ra.') + '</div>'; }
 function pmfaiEsc(s) { return String(s || '').replace(/[&<>]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[m])); }
 function pmfaiAttr(s) { return pmfaiEsc(s).replace(/"/g, '&quot;'); }
 
