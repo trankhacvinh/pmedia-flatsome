@@ -88,7 +88,7 @@ final class PMFAI_Admin_Pages
     public static function block_library(): void
     {
         echo '<div class="wrap pmfai-wrap">'; self::header('Block Library', 'Kho block đã import/generate để tái sử dụng cho Flatsome.');
-        echo '<div class="pmfai-panel"><div class="pmfai-toolbar"><input id="pmfai-library-search" placeholder="Tìm theo tên block..."> <select id="pmfai-library-type"><option value="">Tất cả loại</option><option value="hero">Hero</option><option value="service">Service</option><option value="pricing">Pricing</option><option value="faq">FAQ</option><option value="cta">CTA</option><option value="custom">Custom</option></select> <button class="button button-primary" id="pmfai-load-library">Tải danh sách</button></div><div id="pmfai-library-result"></div></div></div>';
+        echo '<div class="pmfai-panel"><div class="pmfai-toolbar"><input id="pmfai-library-search" placeholder="Tìm theo tên block..."> <input id="pmfai-library-industry" placeholder="Ngành nghề..."> <select id="pmfai-library-type"><option value="">Tất cả loại</option><option value="hero">Hero</option><option value="service">Service</option><option value="pricing">Pricing</option><option value="faq">FAQ</option><option value="cta">CTA</option><option value="custom">Custom</option></select> <button class="button button-primary" id="pmfai-load-library">Tải danh sách</button></div><div class="pmfai-import-json"><h3>Import block JSON</h3><textarea id="pmfai-import-json" rows="6" placeholder="Dán JSON block đã export tại đây..."></textarea><p><button class="button" id="pmfai-import-json-button">Import JSON</button></p></div><div id="pmfai-library-result"></div></div></div>';
     }
 
     public static function prompt_library(): void
