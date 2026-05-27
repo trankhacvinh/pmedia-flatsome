@@ -116,6 +116,11 @@ document.addEventListener('click', async function (e) {
     await loadPmfaiLibrary();
   }
 
+  if (t.id === 'pmfai-load-usage') {
+    e.preventDefault();
+    await loadPmfaiUsageLogs();
+  }
+
   if (t.id === 'pmfai-import-json-button') {
     e.preventDefault();
     const raw = document.getElementById('pmfai-import-json').value;
@@ -189,6 +194,7 @@ document.addEventListener('click', async function (e) {
 
 document.addEventListener('DOMContentLoaded', function () {
   if (document.getElementById('pmfai-library-result')) loadPmfaiLibrary();
+  if (document.getElementById('pmfai-usage-result')) loadPmfaiUsageLogs();
 });
 
 async function pmfaiFetch(path, method, body) {
@@ -218,6 +224,32 @@ async function loadPmfaiLibrary() {
     h += '<tr><td><strong>' + pmfaiEsc(item.title) + '</strong><br><small>' + pmfaiEsc(item.description || '') + '</small></td><td>' + pmfaiEsc(item.type || '') + '</td><td>' + pmfaiEsc(item.industry || '') + '</td><td>' + pmfaiEsc(item.style || '') + '</td><td>CSS ' + css + ' / Flatsome ' + flat + '</td><td>' + pmfaiEsc(item.created_at || '') + '</td><td><button class="button pmfai-view-block" data-id="' + item.id + '">Xem</button> <button class="button pmfai-duplicate-block" data-id="' + item.id + '">Duplicate</button> <button class="button pmfai-export-block" data-id="' + item.id + '">Export</button> <button class="button pmfai-delete-block" data-id="' + item.id + '">Xóa</button></td></tr>';
   });
   h += '</tbody></table><div id="pmfai-library-detail" class="pmfai-panel pmfai-library-detail"></div>';
+  result.innerHTML = h;
+}
+
+async function loadPmfaiUsageLogs() {
+  const result = document.getElementById('pmfai-usage-result');
+  const status = document.getElementById('pmfai-usage-status') ? document.getElementById('pmfai-usage-status').value : '';
+  const mode = document.getElementById('pmfai-usage-mode') ? document.getElementById('pmfai-usage-mode').value : '';
+  const data = await pmfaiFetch('/usage-logs?per_page=100&status=' + encodeURIComponent(status) + '&mode=' + encodeURIComponent(mode), 'GET');
+  const summary = data.summary || {};
+  let h = '<div class="pmfai-usage-summary">';
+  h += '<span class="pmfai-score">Logs: ' + (summary.recent_count || 0) + '</span>';
+  h += '<span class="pmfai-score">Success: ' + (summary.success || 0) + '</span>';
+  h += '<span class="pmfai-score">Error: ' + (summary.error || 0) + '</span>';
+  h += '<span class="pmfai-score">Prompt tokens: ' + (summary.prompt_tokens || 0) + '</span>';
+  h += '<span class="pmfai-score">Completion tokens: ' + (summary.completion_tokens || 0) + '</span>';
+  h += '<span class="pmfai-score">Total tokens: ' + (summary.total_tokens || 0) + '</span>';
+  h += '</div>';
+  if (!data.items || !data.items.length) {
+    result.innerHTML = h + '<p>Chưa có usage log nào.</p>';
+    return;
+  }
+  h += '<table class="widefat striped pmfai-usage-table"><thead><tr><th>Thời gian</th><th>User</th><th>Status</th><th>Mode</th><th>Model</th><th>Type</th><th>Tokens</th><th>Duration</th><th>Error</th></tr></thead><tbody>';
+  data.items.forEach(item => {
+    h += '<tr><td>' + pmfaiEsc(item.created_at || '') + '</td><td>' + pmfaiEsc(item.user_login || '') + '</td><td><strong>' + pmfaiEsc(item.status || '') + '</strong></td><td>' + pmfaiEsc(item.mode || '') + '</td><td>' + pmfaiEsc(item.model || '') + '</td><td>' + pmfaiEsc(item.type || '') + '</td><td>' + (item.total_tokens || 0) + ' <small>(' + (item.prompt_tokens || 0) + '/' + (item.completion_tokens || 0) + ')</small></td><td>' + (item.duration_ms || 0) + 'ms</td><td>' + pmfaiEsc(item.error_message || '') + '</td></tr>';
+  });
+  h += '</tbody></table>';
   result.innerHTML = h;
 }
 
@@ -254,6 +286,7 @@ function renderPmfaiResult(j, canSave, withPreview) {
   let h = '<div class="pmfai-result">';
   if (j.title) h += '<h2>' + pmfaiEsc(j.title) + '</h2>';
   if (j.cost_mode || j.model) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
+  if (j.usage && j.usage.total_tokens) h += '<p><span class="pmfai-score">Tokens: ' + j.usage.total_tokens + '</span></p>';
   if (j.scores) h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
   if (j.parse_error) h += '<div class="notice notice-warning"><p>AI trả về chưa parse được: ' + pmfaiEsc(j.parse_error) + '</p></div>';
   if (j.changes && j.changes.length) h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
