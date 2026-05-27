@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+
+- Enhanced Block Library for team reuse.
+- Update block metadata and code from the Library detail view.
+- Duplicate block action.
+- Export block as JSON and copy to clipboard.
+- Import block JSON back into Library.
+- Filter block list by industry.
+- Added `tags` metadata for blocks.
+- New REST endpoints:
+  - `PUT /wp-json/pmedia-ai/v1/blocks/{id}`
+  - `POST /wp-json/pmedia-ai/v1/blocks/{id}/duplicate`
+  - `GET /wp-json/pmedia-ai/v1/blocks/{id}/export`
+  - `POST /wp-json/pmedia-ai/v1/blocks/import`
+
 ## 1.6.0
 
 ### Changed
