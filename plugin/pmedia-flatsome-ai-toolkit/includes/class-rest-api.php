@@ -7,6 +7,14 @@ final class PMFAI_REST_API
     {
         register_rest_route('pmedia-ai/v1', '/bridge-prompt', ['methods' => 'POST', 'callback' => [__CLASS__, 'bridge_prompt'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/generate-block', ['methods' => 'POST', 'callback' => [__CLASS__, 'generate_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/design-system/bridge-prompt', ['methods' => 'POST', 'callback' => [__CLASS__, 'design_system_bridge_prompt'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/design-system/generate', ['methods' => 'POST', 'callback' => [__CLASS__, 'design_system_generate'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/design-system/import', ['methods' => 'POST', 'callback' => [__CLASS__, 'design_system_import'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/design-system/apply', ['methods' => 'POST', 'callback' => [__CLASS__, 'design_system_apply'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-builder/bridge-prompt', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_bridge_prompt'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-builder/generate', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_generate'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-builder/import', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_import'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-builder/create-draft', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_create_draft'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/parse-chatgpt-block', ['methods' => 'POST', 'callback' => [__CLASS__, 'parse_chatgpt_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/validate-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'validate_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/auto-fix-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'auto_fix_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
@@ -21,10 +29,7 @@ final class PMFAI_REST_API
         register_rest_route('pmedia-ai/v1', '/blocks/(?P<id>\d+)/export', ['methods' => 'GET', 'callback' => [__CLASS__, 'export_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
     }
 
-    public static function can_manage(): bool
-    {
-        return current_user_can('manage_options');
-    }
+    public static function can_manage(): bool { return current_user_can('manage_options'); }
 
     public static function bridge_prompt(WP_REST_Request $request)
     {
@@ -34,9 +39,54 @@ final class PMFAI_REST_API
 
     public static function generate_block(WP_REST_Request $request)
     {
-        $params = $request->get_json_params() ?: [];
-        $generated = PMFAI_AI_Service::generate_block($params);
+        $generated = PMFAI_AI_Service::generate_block($request->get_json_params() ?: []);
         return is_wp_error($generated) ? $generated : rest_ensure_response($generated);
+    }
+
+    public static function design_system_bridge_prompt(WP_REST_Request $request)
+    {
+        return rest_ensure_response(['prompt' => PMFAI_Design_System_AI::bridge_prompt($request->get_json_params() ?: [])]);
+    }
+
+    public static function design_system_generate(WP_REST_Request $request)
+    {
+        $result = PMFAI_Design_System_AI::generate($request->get_json_params() ?: []);
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
+    }
+
+    public static function design_system_import(WP_REST_Request $request)
+    {
+        $result = PMFAI_Design_System_AI::parse_json($request->get_param('raw') ?: '');
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
+    }
+
+    public static function design_system_apply(WP_REST_Request $request)
+    {
+        $result = PMFAI_Design_System_AI::apply($request->get_json_params() ?: []);
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
+    }
+
+    public static function page_builder_bridge_prompt(WP_REST_Request $request)
+    {
+        return rest_ensure_response(['prompt' => PMFAI_Page_Builder_AI::bridge_prompt($request->get_json_params() ?: [])]);
+    }
+
+    public static function page_builder_generate(WP_REST_Request $request)
+    {
+        $result = PMFAI_Page_Builder_AI::generate($request->get_json_params() ?: []);
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
+    }
+
+    public static function page_builder_import(WP_REST_Request $request)
+    {
+        $result = PMFAI_Page_Builder_AI::parse_json($request->get_param('raw') ?: '');
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
+    }
+
+    public static function page_builder_create_draft(WP_REST_Request $request)
+    {
+        $result = PMFAI_Page_Builder_AI::create_draft($request->get_json_params() ?: []);
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
     }
 
     public static function parse_chatgpt_block(WP_REST_Request $request)
@@ -78,15 +128,13 @@ final class PMFAI_REST_API
 
     public static function save_block(WP_REST_Request $request)
     {
-        $params = $request->get_json_params() ?: [];
-        $saved = PMFAI_Block_Library::save($params);
+        $saved = PMFAI_Block_Library::save($request->get_json_params() ?: []);
         return is_wp_error($saved) ? $saved : rest_ensure_response($saved);
     }
 
     public static function import_block(WP_REST_Request $request)
     {
-        $params = $request->get_json_params() ?: [];
-        $imported = PMFAI_Block_Library::import($params);
+        $imported = PMFAI_Block_Library::import($request->get_json_params() ?: []);
         return is_wp_error($imported) ? $imported : rest_ensure_response($imported);
     }
 
@@ -98,8 +146,7 @@ final class PMFAI_REST_API
 
     public static function update_block(WP_REST_Request $request)
     {
-        $params = $request->get_json_params() ?: [];
-        $updated = PMFAI_Block_Library::update(absint($request['id']), $params);
+        $updated = PMFAI_Block_Library::update(absint($request['id']), $request->get_json_params() ?: []);
         return is_wp_error($updated) ? $updated : rest_ensure_response($updated);
     }
 
