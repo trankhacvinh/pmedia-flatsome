@@ -6,6 +6,7 @@ final class PMFAI_Plugin
     public static function init(): void
     {
         add_action('init', ['PMFAI_Post_Types', 'register']);
+        add_action('init', ['PMFAI_Usage_Logger', 'register']);
         add_action('admin_menu', ['PMFAI_Admin_Pages', 'register_menu']);
         add_action('admin_init', ['PMFAI_Settings', 'register']);
         add_action('admin_enqueue_scripts', ['PMFAI_Assets', 'admin']);
@@ -17,6 +18,7 @@ final class PMFAI_Plugin
     {
         update_option(PMFAI_OPTION_KEY, wp_parse_args(get_option(PMFAI_OPTION_KEY, []), PMFAI_Settings::default_options()));
         PMFAI_Post_Types::register();
+        PMFAI_Usage_Logger::register();
         flush_rewrite_rules();
     }
 }
