@@ -13,6 +13,7 @@ final class PMFAI_Admin_Pages
         add_submenu_page('pmedia-ai-builder', 'Import From ChatGPT', 'Import From ChatGPT', 'manage_options', 'pmfai-import-chatgpt', [__CLASS__, 'import_chatgpt']);
         add_submenu_page('pmedia-ai-builder', 'Clean / Validate Code', 'Clean / Validate Code', 'manage_options', 'pmfai-clean-code', [__CLASS__, 'validate_code']);
         add_submenu_page('pmedia-ai-builder', 'Block Library', 'Block Library', 'manage_options', 'pmfai-block-library', [__CLASS__, 'block_library']);
+        add_submenu_page('pmedia-ai-builder', 'Usage Logs', 'Usage Logs', 'manage_options', 'pmfai-usage-logs', [__CLASS__, 'usage_logs']);
         add_submenu_page('pmedia-ai-builder', 'Prompt Library', 'Prompt Library', 'manage_options', 'pmfai-prompt-library', [__CLASS__, 'prompt_library']);
         add_submenu_page('pmedia-ai-builder', 'Settings', 'Settings', 'manage_options', 'pmfai-settings', [__CLASS__, 'settings']);
     }
@@ -103,6 +104,13 @@ final class PMFAI_Admin_Pages
     {
         echo '<div class="wrap pmfai-wrap">'; self::header('Block Library', 'Kho block đã import/generate để tái sử dụng cho Flatsome.');
         echo '<div class="pmfai-panel"><div class="pmfai-toolbar"><input id="pmfai-library-search" placeholder="Tìm theo tên block..."> <input id="pmfai-library-industry" placeholder="Ngành nghề..."> <select id="pmfai-library-type"><option value="">Tất cả loại</option><option value="hero">Hero</option><option value="service">Service</option><option value="pricing">Pricing</option><option value="faq">FAQ</option><option value="cta">CTA</option><option value="custom">Custom</option></select> <button class="button button-primary" id="pmfai-load-library">Tải danh sách</button></div><div class="pmfai-import-json"><h3>Import block JSON</h3><textarea id="pmfai-import-json" rows="6" placeholder="Dán JSON block đã export tại đây..."></textarea><p><button class="button" id="pmfai-import-json-button">Import JSON</button></p></div><div id="pmfai-library-result"></div></div></div>';
+    }
+
+    public static function usage_logs(): void
+    {
+        echo '<div class="wrap pmfai-wrap">';
+        self::header('Usage Logs', 'Theo dõi lượt gọi AI, mode, model, trạng thái, token và thời gian xử lý.');
+        echo '<div class="pmfai-panel"><div class="pmfai-toolbar"><select id="pmfai-usage-status"><option value="">Tất cả trạng thái</option><option value="success">Success</option><option value="error">Error</option></select> <select id="pmfai-usage-mode"><option value="">Tất cả mode</option><option value="fast">Fast / Cheap</option><option value="balanced">Balanced</option><option value="high">High Quality</option></select> <button class="button button-primary" id="pmfai-load-usage">Tải logs</button></div><div id="pmfai-usage-result"></div></div></div>';
     }
 
     public static function prompt_library(): void
