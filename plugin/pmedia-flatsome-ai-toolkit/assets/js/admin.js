@@ -57,9 +57,7 @@ document.addEventListener('click', async function (e) {
     e.preventDefault();
     if (!pmfaiLastParsedBlock) return;
     const saved = await pmfaiFetch('/blocks', 'POST', Object.assign({}, pmfaiLastParsedBlock, {source: 'chatgpt-bridge'}));
-    if (saved.id) {
-      alert('Đã lưu block #' + saved.id + ' vào Library.');
-    }
+    if (saved.id) alert('Đã lưu block #' + saved.id + ' vào Library.');
   }
 
   if (t.id === 'pmfai-validate-code') {
@@ -93,11 +91,67 @@ document.addEventListener('click', async function (e) {
     await loadPmfaiLibrary();
   }
 
+  if (t.id === 'pmfai-import-json-button') {
+    e.preventDefault();
+    const raw = document.getElementById('pmfai-import-json').value;
+    try {
+      const parsed = JSON.parse(raw);
+      const imported = await pmfaiFetch('/blocks/import', 'POST', parsed);
+      if (imported.id) {
+        alert('Đã import block #' + imported.id);
+        document.getElementById('pmfai-import-json').value = '';
+        await loadPmfaiLibrary();
+      } else {
+        alert(imported.message || 'Import thất bại.');
+      }
+    } catch (err) {
+      alert('JSON không hợp lệ: ' + err.message);
+    }
+  }
+
   if (t.classList.contains('pmfai-view-block')) {
     e.preventDefault();
     const block = await pmfaiFetch('/blocks/' + t.dataset.id, 'GET');
-    document.getElementById('pmfai-library-detail').innerHTML = renderPmfaiResult(block, false, true) + '<p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.html || '') + '">Copy HTML</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.css || '') + '">Copy CSS</button></p>';
+    document.getElementById('pmfai-library-detail').innerHTML = renderLibraryDetail(block);
     renderAllPreviewIframes();
+  }
+
+  if (t.classList.contains('pmfai-save-block-meta')) {
+    e.preventDefault();
+    const id = t.dataset.id;
+    const updated = await pmfaiFetch('/blocks/' + id, 'PUT', {
+      title: document.getElementById('pmfai-edit-title').value,
+      type: document.getElementById('pmfai-edit-type').value,
+      style: document.getElementById('pmfai-edit-style').value,
+      industry: document.getElementById('pmfai-edit-industry').value,
+      tags: document.getElementById('pmfai-edit-tags').value,
+      description: document.getElementById('pmfai-edit-description').value,
+      html: document.getElementById('pmfai-edit-html').value,
+      css: document.getElementById('pmfai-edit-css').value,
+      js: document.getElementById('pmfai-edit-js').value
+    });
+    document.getElementById('pmfai-library-detail').innerHTML = renderLibraryDetail(updated);
+    await loadPmfaiLibrary();
+    renderAllPreviewIframes();
+  }
+
+  if (t.classList.contains('pmfai-duplicate-block')) {
+    e.preventDefault();
+    const duplicated = await pmfaiFetch('/blocks/' + t.dataset.id + '/duplicate', 'POST', {});
+    if (duplicated.id) {
+      alert('Đã duplicate thành block #' + duplicated.id);
+      await loadPmfaiLibrary();
+    }
+  }
+
+  if (t.classList.contains('pmfai-export-block')) {
+    e.preventDefault();
+    const exported = await pmfaiFetch('/blocks/' + t.dataset.id + '/export', 'GET');
+    if (exported.id) {
+      const json = JSON.stringify(exported, null, 2);
+      navigator.clipboard.writeText(json);
+      document.getElementById('pmfai-library-detail').innerHTML += '<div class="notice notice-success"><p>Đã copy JSON export vào clipboard.</p></div>';
+    }
   }
 
   if (t.classList.contains('pmfai-delete-block')) {
@@ -109,9 +163,7 @@ document.addEventListener('click', async function (e) {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
-  if (document.getElementById('pmfai-library-result')) {
-    loadPmfaiLibrary();
-  }
+  if (document.getElementById('pmfai-library-result')) loadPmfaiLibrary();
 });
 
 async function pmfaiFetch(path, method, body) {
@@ -128,87 +180,77 @@ async function loadPmfaiLibrary() {
   const result = document.getElementById('pmfai-library-result');
   const s = document.getElementById('pmfai-library-search') ? document.getElementById('pmfai-library-search').value : '';
   const type = document.getElementById('pmfai-library-type') ? document.getElementById('pmfai-library-type').value : '';
-  const data = await pmfaiFetch('/blocks?per_page=50&s=' + encodeURIComponent(s) + '&type=' + encodeURIComponent(type), 'GET');
+  const industry = document.getElementById('pmfai-library-industry') ? document.getElementById('pmfai-library-industry').value : '';
+  const data = await pmfaiFetch('/blocks?per_page=50&s=' + encodeURIComponent(s) + '&type=' + encodeURIComponent(type) + '&industry=' + encodeURIComponent(industry), 'GET');
   if (!data.items || !data.items.length) {
     result.innerHTML = '<p>Chưa có block nào trong Library.</p><div id="pmfai-library-detail"></div>';
     return;
   }
-  let h = '<table class="widefat striped pmfai-library-table"><thead><tr><th>Tên</th><th>Loại</th><th>Style</th><th>Điểm</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>';
+  let h = '<table class="widefat striped pmfai-library-table"><thead><tr><th>Tên</th><th>Loại</th><th>Ngành</th><th>Style</th><th>Điểm</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>';
   data.items.forEach(item => {
     const css = item.scores && item.scores.css_safety ? item.scores.css_safety : '-';
     const flat = item.scores && item.scores.flatsome_compatibility ? item.scores.flatsome_compatibility : '-';
-    h += '<tr><td><strong>' + pmfaiEsc(item.title) + '</strong><br><small>' + pmfaiEsc(item.description || '') + '</small></td><td>' + pmfaiEsc(item.type || '') + '</td><td>' + pmfaiEsc(item.style || '') + '</td><td>CSS ' + css + ' / Flatsome ' + flat + '</td><td>' + pmfaiEsc(item.created_at || '') + '</td><td><button class="button pmfai-view-block" data-id="' + item.id + '">Xem</button> <button class="button pmfai-delete-block" data-id="' + item.id + '">Xóa</button></td></tr>';
+    h += '<tr><td><strong>' + pmfaiEsc(item.title) + '</strong><br><small>' + pmfaiEsc(item.description || '') + '</small></td><td>' + pmfaiEsc(item.type || '') + '</td><td>' + pmfaiEsc(item.industry || '') + '</td><td>' + pmfaiEsc(item.style || '') + '</td><td>CSS ' + css + ' / Flatsome ' + flat + '</td><td>' + pmfaiEsc(item.created_at || '') + '</td><td><button class="button pmfai-view-block" data-id="' + item.id + '">Xem</button> <button class="button pmfai-duplicate-block" data-id="' + item.id + '">Duplicate</button> <button class="button pmfai-export-block" data-id="' + item.id + '">Export</button> <button class="button pmfai-delete-block" data-id="' + item.id + '">Xóa</button></td></tr>';
   });
   h += '</tbody></table><div id="pmfai-library-detail" class="pmfai-panel pmfai-library-detail"></div>';
   result.innerHTML = h;
 }
 
-function pmfaiEsc(s) {
-  return String(s || '').replace(/[&<>]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[m]));
+function renderLibraryDetail(block) {
+  if (block.code && block.message) return '<div class="notice notice-error"><p>' + pmfaiEsc(block.message) + '</p></div>';
+  let h = '<div class="pmfai-library-editor">';
+  h += '<h2>Chỉnh sửa block #' + block.id + '</h2>';
+  h += '<div class="pmfai-grid-2">';
+  h += editField('pmfai-edit-title', 'Tên block', block.title || '');
+  h += editField('pmfai-edit-type', 'Loại block', block.type || '');
+  h += editField('pmfai-edit-style', 'Style', block.style || '');
+  h += editField('pmfai-edit-industry', 'Ngành nghề', block.industry || '');
+  h += editField('pmfai-edit-tags', 'Tags', block.tags || '');
+  h += '</div>';
+  h += '<label class="pmfai-field"><span>Mô tả</span><textarea id="pmfai-edit-description" rows="3">' + pmfaiEsc(block.description || '') + '</textarea></label>';
+  h += renderPreviewBox(block.html || '', block.css || '');
+  h += '<label class="pmfai-field"><span>HTML</span><textarea id="pmfai-edit-html" rows="10">' + pmfaiEsc(block.html || '') + '</textarea></label>';
+  h += '<label class="pmfai-field"><span>CSS</span><textarea id="pmfai-edit-css" rows="8">' + pmfaiEsc(block.css || '') + '</textarea></label>';
+  h += '<label class="pmfai-field"><span>JS</span><textarea id="pmfai-edit-js" rows="5">' + pmfaiEsc(block.js || '') + '</textarea></label>';
+  h += '<p><button class="button button-primary pmfai-save-block-meta" data-id="' + block.id + '">Lưu thay đổi</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.html || '') + '">Copy HTML</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.css || '') + '">Copy CSS</button></p>';
+  h += '</div>';
+  return h;
 }
 
-function pmfaiAttr(s) {
-  return pmfaiEsc(s).replace(/"/g, '&quot;');
+function editField(id, label, value) {
+  return '<label class="pmfai-field"><span>' + pmfaiEsc(label) + '</span><input id="' + id + '" value="' + pmfaiAttr(value) + '"></label>';
 }
+
+function pmfaiEsc(s) { return String(s || '').replace(/[&<>]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[m])); }
+function pmfaiAttr(s) { return pmfaiEsc(s).replace(/"/g, '&quot;'); }
 
 function renderPmfaiResult(j, canSave, withPreview) {
-  if (j.code && j.message) {
-    return '<div class="notice notice-error"><p>' + pmfaiEsc(j.message) + '</p></div>';
-  }
-
+  if (j.code && j.message) return '<div class="notice notice-error"><p>' + pmfaiEsc(j.message) + '</p></div>';
   let h = '<div class="pmfai-result">';
   if (j.title) h += '<h2>' + pmfaiEsc(j.title) + '</h2>';
-  if (j.scores) {
-    h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
-  }
-  if (j.changes && j.changes.length) {
-    h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
-  }
-  if (j.warnings && j.warnings.length) {
-    h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
-  }
-  if (j.suggestions && j.suggestions.length) {
-    h += '<h3>Gợi ý</h3><ul>' + j.suggestions.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
-  }
-  if (canSave && j.html) {
-    h += '<p><button class="button button-primary" id="pmfai-save-imported-block">Save to Library</button></p>';
-  }
-  if (withPreview && j.html) {
-    h += renderPreviewBox(j.html || '', j.css || '');
-  }
-  if (j.html) {
-    h += '<h3>HTML</h3><pre>' + pmfaiEsc(j.html) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.html) + '">Copy HTML</button></p>';
-  }
-  if (j.css) {
-    h += '<h3>CSS</h3><pre>' + pmfaiEsc(j.css) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.css) + '">Copy CSS</button></p>';
-  }
+  if (j.scores) h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
+  if (j.changes && j.changes.length) h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
+  if (j.warnings && j.warnings.length) h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
+  if (j.suggestions && j.suggestions.length) h += '<h3>Gợi ý</h3><ul>' + j.suggestions.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
+  if (canSave && j.html) h += '<p><button class="button button-primary" id="pmfai-save-imported-block">Save to Library</button></p>';
+  if (withPreview && j.html) h += renderPreviewBox(j.html || '', j.css || '');
+  if (j.html) h += '<h3>HTML</h3><pre>' + pmfaiEsc(j.html) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.html) + '">Copy HTML</button></p>';
+  if (j.css) h += '<h3>CSS</h3><pre>' + pmfaiEsc(j.css) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.css) + '">Copy CSS</button></p>';
   return h + '</div>';
 }
 
 function renderPreviewBox(html, css) {
-  return '<div class="pmfai-preview-wrap" data-size="desktop">' +
-    '<div class="pmfai-preview-toolbar"><strong>Preview Sandbox</strong><span>' +
-    '<button class="button button-primary pmfai-preview-size" data-size="desktop">Desktop</button> ' +
-    '<button class="button pmfai-preview-size" data-size="tablet">Tablet</button> ' +
-    '<button class="button pmfai-preview-size" data-size="mobile">Mobile</button>' +
-    '</span></div>' +
-    '<iframe class="pmfai-preview-frame" data-html="' + pmfaiAttr(html) + '" data-css="' + pmfaiAttr(css || '') + '" sandbox="allow-same-origin"></iframe>' +
-    '</div>';
+  return '<div class="pmfai-preview-wrap" data-size="desktop"><div class="pmfai-preview-toolbar"><strong>Preview Sandbox</strong><span><button class="button button-primary pmfai-preview-size" data-size="desktop">Desktop</button> <button class="button pmfai-preview-size" data-size="tablet">Tablet</button> <button class="button pmfai-preview-size" data-size="mobile">Mobile</button></span></div><iframe class="pmfai-preview-frame" data-html="' + pmfaiAttr(html) + '" data-css="' + pmfaiAttr(css || '') + '" sandbox="allow-same-origin"></iframe></div>';
 }
 
 function renderAllPreviewIframes() {
   document.querySelectorAll('.pmfai-preview-frame').forEach(frame => {
-    const html = frame.dataset.html || '';
-    const css = frame.dataset.css || '';
-    frame.srcdoc = buildPreviewDocument(html, css);
+    frame.srcdoc = buildPreviewDocument(frame.dataset.html || '', frame.dataset.css || '');
   });
 }
 
 function buildPreviewDocument(html, css) {
   const tokenCss = (window.PMFAI && PMFAI.tokensCss) ? PMFAI.tokensCss : ':root{--pm-color-primary:#e31e24;--pm-color-secondary:#111827;--pm-color-accent:#f59e0b;--pm-color-text:#1f2937;--pm-color-muted:#6b7280;--pm-color-border:#e5e7eb;--pm-color-bg-soft:#f9fafb;--pm-radius-sm:8px;--pm-radius-md:16px;--pm-radius-lg:24px;--pm-section-padding:72px;--pm-section-padding-mobile:42px;--pm-shadow-sm:0 4px 16px rgba(15,23,42,.08);--pm-shadow-md:0 14px 36px rgba(15,23,42,.12)}';
-  const baseCss = `
-    ${tokenCss}
-    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--pm-color-text);background:#fff}.row{display:flex;flex-wrap:wrap;gap:24px;max-width:1180px;margin:0 auto}.col{box-sizing:border-box;flex:1 1 0}.col-inner{width:100%}.small-12{flex-basis:100%}.medium-6,.large-6{flex-basis:calc(50% - 12px)}.button{display:inline-flex;align-items:center;justify-content:center;padding:12px 20px;border-radius:var(--pm-radius-sm);text-decoration:none;font-weight:700}.button.primary{background:var(--pm-color-primary);color:#fff}.pm-section{padding:var(--pm-section-padding) 20px}.pm-section-soft{background:var(--pm-color-bg-soft)}.pm-section-title{text-align:center;max-width:780px;margin:0 auto 36px}.pm-eyebrow{display:inline-block;color:var(--pm-color-primary);font-weight:800;text-transform:uppercase;font-size:13px;letter-spacing:.08em;margin-bottom:10px}.pm-lead{font-size:18px;line-height:1.7;color:var(--pm-color-muted)}.pm-card,.pm-cta-box,.pm-pricing-card,.pm-step{background:#fff;border:1px solid var(--pm-color-border);border-radius:var(--pm-radius-md);box-shadow:var(--pm-shadow-sm);padding:24px}.pm-hero-split,.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{display:grid;gap:24px}.pm-hero-split{grid-template-columns:1.05fr .95fr;align-items:center}.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{grid-template-columns:repeat(3,1fr)}.pm-feature-list{margin:0;padding:0;list-style:none}.pm-feature-list li{margin:0 0 10px;padding-left:24px;position:relative}.pm-feature-list li:before{content:"✓";position:absolute;left:0;color:var(--pm-color-primary);font-weight:900}@media(max-width:849px){.pm-section{padding:var(--pm-section-padding-mobile) 16px}.pm-hero-split,.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{grid-template-columns:1fr}.medium-6,.large-6{flex-basis:100%}}
-  `;
+  const baseCss = `${tokenCss} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--pm-color-text);background:#fff}.row{display:flex;flex-wrap:wrap;gap:24px;max-width:1180px;margin:0 auto}.col{box-sizing:border-box;flex:1 1 0}.col-inner{width:100%}.small-12{flex-basis:100%}.medium-6,.large-6{flex-basis:calc(50% - 12px)}.button{display:inline-flex;align-items:center;justify-content:center;padding:12px 20px;border-radius:var(--pm-radius-sm);text-decoration:none;font-weight:700}.button.primary{background:var(--pm-color-primary);color:#fff}.pm-section{padding:var(--pm-section-padding) 20px}.pm-section-soft{background:var(--pm-color-bg-soft)}.pm-section-title{text-align:center;max-width:780px;margin:0 auto 36px}.pm-eyebrow{display:inline-block;color:var(--pm-color-primary);font-weight:800;text-transform:uppercase;font-size:13px;letter-spacing:.08em;margin-bottom:10px}.pm-lead{font-size:18px;line-height:1.7;color:var(--pm-color-muted)}.pm-card,.pm-cta-box,.pm-pricing-card,.pm-step{background:#fff;border:1px solid var(--pm-color-border);border-radius:var(--pm-radius-md);box-shadow:var(--pm-shadow-sm);padding:24px}.pm-hero-split,.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{display:grid;gap:24px}.pm-hero-split{grid-template-columns:1.05fr .95fr;align-items:center}.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{grid-template-columns:repeat(3,1fr)}.pm-feature-list{margin:0;padding:0;list-style:none}.pm-feature-list li{margin:0 0 10px;padding-left:24px;position:relative}.pm-feature-list li:before{content:"✓";position:absolute;left:0;color:var(--pm-color-primary);font-weight:900}@media(max-width:849px){.pm-section{padding:var(--pm-section-padding-mobile) 16px}.pm-hero-split,.pm-service-grid,.pm-pricing,.pm-process,.pm-stats{grid-template-columns:1fr}.medium-6,.large-6{flex-basis:100%}}`;
   return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + baseCss + '\n' + css + '</style></head><body>' + html + '</body></html>';
 }
