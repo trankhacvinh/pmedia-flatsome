@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- Block Library thật sự dùng custom post type `pmedia_ai_block`.
+- Class `PMFAI_Block_Library` để lưu, lấy danh sách, xem chi tiết và xóa block.
+- REST endpoints:
+  - `GET /wp-json/pmedia-ai/v1/blocks`
+  - `POST /wp-json/pmedia-ai/v1/blocks`
+  - `GET /wp-json/pmedia-ai/v1/blocks/{id}`
+  - `DELETE /wp-json/pmedia-ai/v1/blocks/{id}`
+- Admin menu **Block Library**.
+- Nút **Save to Library** sau khi Import From ChatGPT.
+- Xem lại block đã lưu, copy HTML/CSS và xóa block.
+- Bộ lọc đơn giản theo tên và loại block.
+
 ## 1.2.0
 
 ### Changed
