@@ -59,14 +59,25 @@ final class PMFAI_Page_Builder_AI
 
     public static function generate(array $params)
     {
+        $started = microtime(true);
         $options = PMFAI_Settings::get_options();
         $api_key = trim((string)($options['api_key'] ?? ''));
+        $mode = sanitize_key($params['costMode'] ?? 'balanced');
+        $mode_config = self::mode_config($mode, $options);
+        $build_mode = sanitize_key($params['buildMode'] ?? 'full-page');
+
         if ($api_key === '') {
+            PMFAI_Usage_Logger::log([
+                'action' => 'page-builder-generate',
+                'status' => 'error',
+                'mode' => $mode,
+                'model' => $mode_config['model'],
+                'type' => $build_mode,
+                'error_message' => 'Missing API key',
+            ]);
             return new WP_Error('missing_api_key', 'Chưa cấu hình API key trong Settings.', ['status' => 400]);
         }
 
-        $mode = sanitize_key($params['costMode'] ?? 'balanced');
-        $mode_config = self::mode_config($mode, $options);
         $prompt = self::bridge_prompt($params);
         $payload = [
             'model' => $mode_config['model'],
@@ -86,16 +97,57 @@ final class PMFAI_Page_Builder_AI
             'body' => wp_json_encode($payload),
         ]);
 
-        if (is_wp_error($response)) { return $response; }
+        $duration_ms = (int)round((microtime(true) - $started) * 1000);
+
+        if (is_wp_error($response)) {
+            PMFAI_Usage_Logger::log([
+                'action' => 'page-builder-generate',
+                'status' => 'error',
+                'mode' => $mode,
+                'model' => $mode_config['model'],
+                'type' => $build_mode,
+                'duration_ms' => $duration_ms,
+                'error_message' => $response->get_error_message(),
+            ]);
+            return $response;
+        }
+
         $code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $json = json_decode($body, true);
+        $usage = is_array($json['usage'] ?? null) ? $json['usage'] : [];
+
         if ($code < 200 || $code >= 300) {
-            return new WP_Error('api_error', $json['error']['message'] ?? ('AI API error HTTP ' . $code), ['status' => 500]);
+            $message = $json['error']['message'] ?? ('AI API error HTTP ' . $code);
+            PMFAI_Usage_Logger::log([
+                'action' => 'page-builder-generate',
+                'status' => 'error',
+                'mode' => $mode,
+                'model' => $mode_config['model'],
+                'type' => $build_mode,
+                'duration_ms' => $duration_ms,
+                'http_code' => $code,
+                'usage' => $usage,
+                'error_message' => $message,
+            ]);
+            return new WP_Error('api_error', $message, ['status' => 500]);
         }
 
         $content = trim((string)($json['choices'][0]['message']['content'] ?? ''));
-        $parsed = self::parse_json($content, ['raw' => $content, 'prompt' => $prompt, 'usage' => $json['usage'] ?? [], 'cost_mode' => $mode, 'model' => $mode_config['model']]);
+        $parsed = self::parse_json($content, ['raw' => $content, 'prompt' => $prompt, 'usage' => $usage, 'cost_mode' => $mode, 'model' => $mode_config['model']]);
+
+        PMFAI_Usage_Logger::log([
+            'action' => 'page-builder-generate',
+            'status' => is_wp_error($parsed) ? 'error' : 'success',
+            'mode' => $mode,
+            'model' => $mode_config['model'],
+            'type' => $build_mode,
+            'duration_ms' => $duration_ms,
+            'http_code' => $code,
+            'usage' => $usage,
+            'error_message' => is_wp_error($parsed) ? $parsed->get_error_message() : '',
+        ]);
+
         if (is_wp_error($parsed)) { return $parsed; }
         return $parsed;
     }
@@ -158,11 +210,9 @@ final class PMFAI_Page_Builder_AI
         $original = $value;
         $value = trim($value);
 
-        // Some AI responses double-escape JSON strings, leaving visible \n or \" in the decoded value.
         $value = str_replace(["\\r\\n", "\\n", "\\t"], ["\n", "\n", "\t"], $value);
         $value = str_replace(['\\"', "\\'", '\\/'], ['"', "'", '/'], $value);
 
-        // If the whole value was accidentally JSON-encoded as a string again, decode it once.
         if ((str_starts_with($value, '"') && str_ends_with($value, '"')) || (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
             $maybe = json_decode($value, true);
             if (is_string($maybe)) {
