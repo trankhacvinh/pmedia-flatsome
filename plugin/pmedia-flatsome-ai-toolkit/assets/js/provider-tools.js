@@ -22,6 +22,18 @@
     }
   }
 
+  function insertAnthropicMaxTokensField() {
+    var modelInput = document.querySelector('input[name="pmedia_flatsome_ai_toolkit_options[anthropic_model]"]');
+    if (!modelInput || document.querySelector('input[name="pmedia_flatsome_ai_toolkit_options[anthropic_max_tokens]"]')) return;
+    var label = document.createElement('label');
+    label.className = 'pmfai-field';
+    label.innerHTML = '<span>Anthropic max tokens</span><input type="text" name="pmedia_flatsome_ai_toolkit_options[anthropic_max_tokens]" value="4096"><small>Gợi ý: 4096 cho bình thường, 8192+ cho Page Builder dài nếu model/gói hỗ trợ.</small>';
+    var modelField = modelInput.closest('.pmfai-field');
+    if (modelField && modelField.parentNode) {
+      modelField.parentNode.insertBefore(label, modelField.nextSibling);
+    }
+  }
+
   function renderProviderTestResult(result) {
     if (result.code && result.message) {
       return '<div class="pmfai-status-box is-error"><strong>Test thất bại:</strong> ' + esc(result.message) + '</div>';
@@ -77,6 +89,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     insertProviderTester();
+    insertAnthropicMaxTokensField();
     enhanceUsageLogs();
   });
 
