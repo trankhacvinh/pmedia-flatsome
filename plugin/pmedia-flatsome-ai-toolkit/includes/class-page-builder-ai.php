@@ -35,7 +35,7 @@ final class PMFAI_Page_Builder_AI
         $schema = wp_json_encode(self::schema(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $recommended = implode(', ', PMFAI_Section_Patterns::recommend_for_text($brief));
         $output_rule = $output_mode === 'flatsome-native'
-            ? "Output mode: Flatsome Native Shortcode. Mỗi section nên ưu tiên field shortcode với shortcode Flatsome thuần như [section], [row], [col], [ux_text], [button], [gap], [title], [accordion], [accordion-item]. Chỉ dùng html/css khi shortcode thuần không đủ. Không dùng shortcode lạ không chắc Flatsome hỗ trợ."
+            ? "Output mode: Flatsome Native Shortcode. Mỗi section nên ưu tiên field shortcode với shortcode Flatsome THUẦN: [section], [row], [col], [ux_text], [button], [gap], [title], [accordion], [accordion-item]. TUYỆT ĐỐI không dùng shortcode tự chế như [pm-service-card], [pm-card-icon], [pm-timeline-step], [pm-faq-item]. Nếu cần card custom, viết HTML <div class=\"pm-service-card\">...</div> bên trong [ux_text], không tạo shortcode pm-* ."
             : "Output mode: Flatsome Section + HTML Block. Mỗi section dùng html/css; plugin sẽ tự bọc bằng [section] + [row] + [col]. Đây là mode an toàn nhất.";
 
         return "Bạn là senior UI engineer cho WordPress Flatsome.\n\n"
@@ -50,6 +50,11 @@ final class PMFAI_Page_Builder_AI
             . "- Mỗi card/service/process item nên có icon, number, badge hoặc visual rhythm.\n"
             . "- Copy trong card phải ngắn, tự nhiên, chuyên nghiệp, không văn AI.\n"
             . "- Ưu tiên section có nhịp thị giác: hero mạnh, service rõ, process/timeline, stats/proof, CTA.\n\n"
+            . "Yêu cầu riêng cho Flatsome Native Shortcode mode:\n"
+            . "- Không dùng bất kỳ shortcode nào bắt đầu bằng [pm- hoặc [/pm-.\n"
+            . "- Không viết [title]Nội dung[/title]. Nếu dùng title shortcode thì dùng [title text=\"Nội dung\" tag_name=\"h2\"]. An toàn hơn là dùng [ux_text]<h2>Nội dung</h2>[/ux_text].\n"
+            . "- Không viết [button]Text[/button]. Button phải dùng dạng [button text=\"Text\" link=\"#contact\" color=\"primary\"].\n"
+            . "- HTML class pm-* được phép dùng bên trong [ux_text], nhưng pm-* KHÔNG được là shortcode.\n\n"
             . "Yêu cầu JSON:\n"
             . "- Trả về duy nhất JSON hợp lệ, không markdown, không giải thích.\n"
             . "- HTML, CSS và shortcode phải nằm trong JSON string hợp lệ.\n"
@@ -88,7 +93,7 @@ final class PMFAI_Page_Builder_AI
             'temperature' => $mode_config['temperature'],
             'timeout' => $mode_config['timeout'],
             'messages' => [
-                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Always choose section patterns from the provided Pattern Library. Return JSON only.'],
+                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Use only real Flatsome shortcodes. Never invent custom pm-* shortcodes. Return JSON only.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
         ]);
@@ -193,6 +198,7 @@ final class PMFAI_Page_Builder_AI
             if ($htmlN['changed'] || $cssN['changed'] || $shortcodeN['changed']) { $out['warnings'][] = "Section {$id}: Đã tự sửa chuỗi bị double-escaped."; }
             if ($output_mode !== 'flatsome-native' && trim($html) === '') { $out['warnings'][] = "Section {$id} thiếu HTML và đã bị bỏ qua."; continue; }
             if ($output_mode !== 'flatsome-native' && stripos($html, 'pmedia-ai-block') === false) { $html = '<div class="pmedia-ai-block pm-page-block pm-page-block-' . esc_attr($id) . '">' . "\n" . trim($html) . "\n" . '</div>'; }
+            if ($output_mode === 'flatsome-native' && self::native_shortcode_needs_sanitize($shortcode)) { $out['warnings'][] = "Section {$id}: Đã tự sửa pseudo-shortcode/shortcode sai chuẩn Flatsome trong Native mode."; }
             $normalized = self::normalize_section_css($css); $css = $normalized['css']; foreach ($normalized['warnings'] as $warning) { $out['warnings'][] = "Section {$id}: " . $warning; }
             $out['page']['sections'][] = ['id'=>$id,'type'=>$type,'pattern'=>$pattern,'title'=>sanitize_text_field($section['title'] ?? ''),'goal'=>sanitize_textarea_field($section['goal'] ?? ''),'html'=>$html,'css'=>$css,'shortcode'=>$shortcode,'scores'=>PMFAI_Code_Validator::analyze($html, $css)['scores'] ?? []];
         }
@@ -226,13 +232,105 @@ final class PMFAI_Page_Builder_AI
         $output_mode = self::output_mode($page['output_mode'] ?? 'html-block');
         $content = '';
         foreach ($page['sections'] as $section) {
-            if ($output_mode === 'flatsome-native' && !empty($section['shortcode'])) { $content .= trim((string)$section['shortcode']) . "\n\n"; continue; }
+            if ($output_mode === 'flatsome-native' && !empty($section['shortcode'])) { $content .= trim(self::sanitize_native_shortcode((string)$section['shortcode'], $section)) . "\n\n"; continue; }
             if ($output_mode === 'flatsome-native') { $content .= self::fallback_native_shortcode($section) . "\n\n"; continue; }
             $class = 'pm-section pm-page-section pm-section-' . sanitize_html_class($section['id']) . ' pm-section-type-' . sanitize_html_class($section['type']) . ' pm-pattern-' . sanitize_html_class($section['pattern'] ?? 'custom');
             $html = trim((string)$section['html']); $css = trim((string)$section['css']); $style = $css ? "\n<style>\n" . $css . "\n</style>\n" : '';
             $content .= '[section class="' . esc_attr($class) . '"]' . "\n" . '  [row]' . "\n" . '    [col span__sm="12"]' . "\n" . $style . $html . "\n" . '    [/col]' . "\n" . '  [/row]' . "\n" . '[/section]' . "\n\n";
         }
         return trim($content);
+    }
+
+    private static function native_shortcode_needs_sanitize(string $shortcode): bool
+    {
+        return preg_match('/\[(\/)?pm-[a-z0-9-]+/i', $shortcode) === 1
+            || preg_match('/\[title[^\]]*\][\s\S]*?\[\/title\]/i', $shortcode) === 1
+            || preg_match('/\[button[^\]]*\][\s\S]*?\[\/button\]/i', $shortcode) === 1;
+    }
+
+    private static function sanitize_native_shortcode(string $shortcode, array $section = []): string
+    {
+        $shortcode = self::normalize_flatsome_native_shortcodes($shortcode);
+        $shortcode = self::convert_pm_pseudo_shortcodes_to_html($shortcode);
+        $shortcode = self::normalize_section_pattern_attribute($shortcode, $section);
+        return $shortcode;
+    }
+
+    private static function normalize_flatsome_native_shortcodes(string $shortcode): string
+    {
+        $shortcode = preg_replace_callback('/\[title([^\]]*)\]([\s\S]*?)\[\/title\]/i', function ($m) {
+            $attrs = $m[1];
+            $text = trim(wp_strip_all_tags($m[2]));
+            $tag = self::shortcode_attr_value($attrs, 'tag') ?: self::shortcode_attr_value($attrs, 'tag_name') ?: 'h2';
+            $align = self::shortcode_attr_value($attrs, 'align');
+            $alignAttr = $align ? ' align="' . esc_attr($align) . '"' : '';
+            return '[ux_text' . $alignAttr . ']<' . esc_attr($tag) . '>' . esc_html($text) . '</' . esc_attr($tag) . '>' . '[/ux_text]';
+        }, $shortcode);
+
+        $shortcode = preg_replace_callback('/\[button([^\]]*)\]([\s\S]*?)\[\/button\]/i', function ($m) {
+            $attrs = $m[1];
+            $text = trim(wp_strip_all_tags($m[2]));
+            $url = self::shortcode_attr_value($attrs, 'url') ?: self::shortcode_attr_value($attrs, 'link') ?: '#';
+            $style = self::shortcode_attr_value($attrs, 'style');
+            $color = $style === 'primary' ? ' color="primary"' : '';
+            $outline = $style === 'outline' ? ' style="outline"' : '';
+            return '[button text="' . esc_attr($text) . '" link="' . esc_attr($url) . '"' . $color . $outline . ']';
+        }, $shortcode);
+
+        return $shortcode;
+    }
+
+    private static function convert_pm_pseudo_shortcodes_to_html(string $shortcode): string
+    {
+        $closeMap = [
+            'pm-service-card' => '</div>', 'pm-card-icon' => '</div>', 'pm-card-title' => '</h3>', 'pm-card-text' => '</p>',
+            'pm-timeline-step' => '</div>', 'pm-step-dot' => '</div>', 'pm-faq-item' => '</div>', 'pm-faq-question' => '</h3>', 'pm-faq-answer' => '</p>',
+        ];
+        $openMap = [
+            'pm-service-card' => '<div class="pm-service-card">', 'pm-card-title' => '<h3 class="pm-card-title">', 'pm-card-text' => '<p class="pm-card-text">',
+            'pm-timeline-step' => '<div class="pm-timeline-step">', 'pm-step-dot' => '<div class="pm-step-dot">', 'pm-faq-item' => '<div class="pm-faq-item">',
+            'pm-faq-question' => '<h3 class="pm-faq-question">', 'pm-faq-answer' => '<p class="pm-faq-answer">',
+        ];
+
+        $shortcode = preg_replace_callback('/\[\/(pm-[a-z0-9-]+)\]/i', function ($m) use ($closeMap) {
+            $name = strtolower($m[1]);
+            return $closeMap[$name] ?? '</div>';
+        }, $shortcode);
+
+        $shortcode = preg_replace_callback('/\[(pm-[a-z0-9-]+)([^\]]*)\]/i', function ($m) use ($openMap) {
+            $name = strtolower($m[1]);
+            $attrs = $m[2] ?? '';
+            if ($name === 'pm-card-icon') {
+                $icon = self::shortcode_attr_value($attrs, 'icon');
+                return '<div class="pm-card-icon" aria-hidden="true">' . esc_html($icon ?: '•');
+            }
+            return $openMap[$name] ?? '<div class="' . esc_attr($name) . '">';
+        }, $shortcode);
+
+        return $shortcode;
+    }
+
+    private static function normalize_section_pattern_attribute(string $shortcode, array $section = []): string
+    {
+        $pattern = sanitize_html_class($section['pattern'] ?? 'custom');
+        return preg_replace_callback('/\[section([^\]]*)\]/i', function ($m) use ($pattern) {
+            $attrs = $m[1];
+            $attrs = preg_replace('/\s+pattern="[^"]*"/i', '', $attrs);
+            $class = self::shortcode_attr_value($attrs, 'class');
+            if ($class) {
+                $attrs = preg_replace('/class="[^"]*"/i', 'class="' . esc_attr(trim($class . ' pm-pattern-' . $pattern)) . '"', $attrs);
+            } else {
+                $attrs .= ' class="pm-native-section pm-pattern-' . esc_attr($pattern) . '"';
+            }
+            return '[section' . $attrs . ']';
+        }, $shortcode);
+    }
+
+    private static function shortcode_attr_value(string $attrs, string $name): string
+    {
+        if (preg_match('/\b' . preg_quote($name, '/') . '="([^"]*)"/i', $attrs, $m)) { return (string)$m[1]; }
+        if (preg_match('/\b' . preg_quote($name, '/') . "='([^']*)'/i", $attrs, $m)) { return (string)$m[1]; }
+        return '';
     }
 
     private static function fallback_native_shortcode(array $section): string
