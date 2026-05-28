@@ -18,6 +18,7 @@ final class PMFAI_Plugin
         add_action('wp_enqueue_scripts', ['PMFAI_Assets', 'frontend']);
         add_action('rest_api_init', ['PMFAI_REST_API', 'register']);
         add_action('rest_api_init', ['PMFAI_Page_Section_Regenerator', 'register_routes']);
+        add_action('rest_api_init', ['PMFAI_AI_Provider_Tester', 'register_routes']);
     }
 
     public static function activate(): void
