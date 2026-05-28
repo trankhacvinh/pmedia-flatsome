@@ -14,13 +14,17 @@
     return document.querySelector('input[name="pmedia_flatsome_ai_toolkit_options[' + key + ']"]');
   }
 
+  function selectByKey(key) {
+    return document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[' + key + ']"]');
+  }
+
   function fieldByKey(key) {
-    var input = inputByKey(key);
+    var input = inputByKey(key) || selectByKey(key);
     return input ? input.closest('.pmfai-field') : null;
   }
 
   function insertProviderTester() {
-    var providerSelect = document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[ai_provider]"]');
+    var providerSelect = selectByKey('ai_provider');
     if (!providerSelect || qs('pmfai-provider-test')) return;
     var wrap = document.createElement('div');
     wrap.className = 'pmfai-status-box';
@@ -29,6 +33,21 @@
     if (field && field.parentNode) {
       field.parentNode.insertBefore(wrap, field.nextSibling);
     }
+  }
+
+  function insertFallbackFields() {
+    var providerSelect = selectByKey('ai_provider');
+    if (!providerSelect || inputByKey('enable_provider_fallback')) return;
+    var providerField = providerSelect.closest('.pmfai-field');
+    if (!providerField || !providerField.parentNode) return;
+    var box = document.createElement('div');
+    box.className = 'pmfai-status-box';
+    box.id = 'pmfai-fallback-settings';
+    box.innerHTML = '<strong>Fallback provider</strong><p>Nếu provider chính lỗi, plugin sẽ thử provider dự phòng. Chỉ bật khi anh đã cấu hình provider dự phòng đầy đủ.</p>' +
+      '<label class="pmfai-check"><input type="checkbox" name="pmedia_flatsome_ai_toolkit_options[enable_provider_fallback]" value="1"> Bật fallback provider</label>' +
+      '<label class="pmfai-field"><span>Provider dự phòng</span><select name="pmedia_flatsome_ai_toolkit_options[fallback_provider]"><option value="openai_compatible">OpenAI-compatible</option><option value="openai">OpenAI / ChatGPT</option><option value="anthropic">Anthropic Claude</option></select></label>' +
+      '<small class="pmfai-provider-hint">Lưu ý: fallback có thể phát sinh thêm chi phí vì request lỗi sẽ được thử lại bằng provider khác.</small>';
+    providerField.parentNode.insertBefore(box, providerField.nextSibling);
   }
 
   function insertAnthropicMaxTokensField() {
@@ -44,8 +63,9 @@
   }
 
   function buildProviderGroups() {
-    var providerSelect = document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[ai_provider]"]');
+    var providerSelect = selectByKey('ai_provider');
     if (!providerSelect || document.querySelector('.pmfai-provider-groups')) return;
+    insertFallbackFields();
     insertAnthropicMaxTokensField();
 
     var providerField = providerSelect.closest('.pmfai-field');
@@ -82,6 +102,8 @@
 
     addProviderHints();
     providerSelect.addEventListener('change', refreshProviderGroups);
+    var fallbackSelect = selectByKey('fallback_provider');
+    if (fallbackSelect) fallbackSelect.addEventListener('change', refreshProviderGroups);
     refreshProviderGroups();
   }
 
@@ -105,33 +127,48 @@
     });
   }
 
-  function refreshProviderGroups() {
-    var providerSelect = document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[ai_provider]"]');
-    if (!providerSelect) return;
-    var active = providerSelect.value || 'openai';
-    document.querySelectorAll('.pmfai-provider-group').forEach(function (group) {
-      group.classList.toggle('is-active', group.getAttribute('data-provider-group') === active);
-    });
-
+  function providerMissingKeys(provider) {
     var keyMap = {
       openai: ['api_endpoint', 'api_key', 'api_model'],
       openai_compatible: ['compatible_endpoint', 'compatible_api_key', 'compatible_model'],
       anthropic: ['anthropic_endpoint', 'anthropic_api_key', 'anthropic_model']
     };
     var missing = [];
-    (keyMap[active] || []).forEach(function (key) {
+    (keyMap[provider] || []).forEach(function (key) {
       var input = inputByKey(key);
       if (!input || !String(input.value || '').trim()) missing.push(key);
     });
+    return missing;
+  }
+
+  function refreshProviderGroups() {
+    var providerSelect = selectByKey('ai_provider');
+    if (!providerSelect) return;
+    var active = providerSelect.value || 'openai';
+    document.querySelectorAll('.pmfai-provider-group').forEach(function (group) {
+      group.classList.toggle('is-active', group.getAttribute('data-provider-group') === active);
+    });
+
+    var missing = providerMissingKeys(active);
+    var fallbackEnabled = inputByKey('enable_provider_fallback') && inputByKey('enable_provider_fallback').checked;
+    var fallbackSelect = selectByKey('fallback_provider');
+    var fallback = fallbackSelect ? fallbackSelect.value : '';
+    var fallbackMissing = fallbackEnabled && fallback ? providerMissingKeys(fallback) : [];
 
     var warning = qs('pmfai-provider-warning');
     if (warning) {
       if (missing.length) {
         warning.classList.remove('is-ok');
         warning.textContent = 'Provider đang chọn còn thiếu cấu hình: ' + missing.join(', ') + '. Hãy điền và lưu Settings trước khi test/generate.';
+      } else if (fallbackEnabled && fallback === active) {
+        warning.classList.remove('is-ok');
+        warning.textContent = 'Fallback provider đang trùng với provider chính. Hãy chọn provider dự phòng khác.';
+      } else if (fallbackMissing.length) {
+        warning.classList.remove('is-ok');
+        warning.textContent = 'Fallback provider còn thiếu cấu hình: ' + fallbackMissing.join(', ') + '. Nếu chưa cần fallback, hãy tắt fallback.';
       } else {
         warning.classList.add('is-ok');
-        warning.textContent = 'Provider đang chọn đã có đủ endpoint/API key/model. Hãy lưu Settings rồi bấm Test AI Provider để kiểm tra thực tế.';
+        warning.textContent = fallbackEnabled ? 'Provider chính và fallback đã có đủ cấu hình. Hãy lưu Settings rồi bấm Test AI Provider.' : 'Provider đang chọn đã có đủ endpoint/API key/model. Hãy lưu Settings rồi bấm Test AI Provider.';
       }
     }
   }
@@ -140,7 +177,8 @@
     if (result.code && result.message) {
       return '<div class="pmfai-status-box is-error"><strong>Test thất bại:</strong> ' + esc(result.message) + '</div>';
     }
-    return '<div class="pmfai-status-box is-success"><strong>Kết nối thành công.</strong><br>Provider: ' + esc(result.provider_label || result.provider) + '<br>Model: ' + esc(result.model) + '<br>Duration: ' + esc(result.duration_ms) + 'ms<br><small>' + esc(result.content || '') + '</small></div>';
+    var fallback = result.fallback_used ? '<br><strong>Fallback used:</strong> Yes, primary was ' + esc(result.primary_provider || '') : '';
+    return '<div class="pmfai-status-box is-success"><strong>Kết nối thành công.</strong><br>Provider: ' + esc(result.provider_label || result.provider) + fallback + '<br>Model: ' + esc(result.model) + '<br>Duration: ' + esc(result.duration_ms) + 'ms<br><small>' + esc(result.content || '') + '</small></div>';
   }
 
   function enhanceUsageLogs() {
@@ -191,12 +229,19 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     insertProviderTester();
+    insertFallbackFields();
     insertAnthropicMaxTokensField();
     buildProviderGroups();
     enhanceUsageLogs();
   });
 
   document.addEventListener('input', function (e) {
+    if (e.target && e.target.name && e.target.name.indexOf('pmedia_flatsome_ai_toolkit_options[') === 0) {
+      refreshProviderGroups();
+    }
+  });
+
+  document.addEventListener('change', function (e) {
     if (e.target && e.target.name && e.target.name.indexOf('pmedia_flatsome_ai_toolkit_options[') === 0) {
       refreshProviderGroups();
     }
