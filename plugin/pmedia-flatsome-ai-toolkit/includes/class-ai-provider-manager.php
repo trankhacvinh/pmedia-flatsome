@@ -43,7 +43,10 @@ final class PMFAI_AI_Provider_Manager
 
     public static function model(string $provider_id, array $options, array $request = []): string
     {
-        if (!empty($request['model'])) { return (string)$request['model']; }
+        $requested = trim((string)($request['model'] ?? ''));
+        if ($requested !== '' && self::is_model_compatible($provider_id, $requested)) {
+            return $requested;
+        }
         if ($provider_id === 'anthropic') { return trim((string)($options['anthropic_model'] ?? '')) ?: 'claude-3-5-sonnet-latest'; }
         if ($provider_id === 'openai_compatible') { return trim((string)($options['compatible_model'] ?? '')) ?: (trim((string)($options['api_model'] ?? '')) ?: 'gpt-4.1-mini'); }
         return trim((string)($options['api_model'] ?? '')) ?: 'gpt-4.1-mini';
@@ -57,6 +60,19 @@ final class PMFAI_AI_Provider_Manager
             'anthropic' => 'Anthropic Claude',
         ];
         return $labels[$provider_id] ?? $provider_id;
+    }
+
+    public static function is_model_compatible(string $provider_id, string $model): bool
+    {
+        $model = strtolower(trim($model));
+        if ($model === '') { return false; }
+        if ($provider_id === 'anthropic') {
+            return strpos($model, 'claude') === 0;
+        }
+        if ($provider_id === 'openai' || $provider_id === 'openai_compatible') {
+            return strpos($model, 'claude') !== 0;
+        }
+        return true;
     }
 
     private static function provider(string $provider_id)
