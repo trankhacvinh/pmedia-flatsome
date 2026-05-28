@@ -5,6 +5,10 @@ final class PMFAI_Plugin
 {
     public static function init(): void
     {
+        if (!class_exists('PMFAI_Page_Section_Regenerator')) {
+            require_once PMFAI_DIR . 'includes/class-page-section-regenerator.php';
+        }
+
         add_action('init', ['PMFAI_Post_Types', 'register']);
         add_action('init', ['PMFAI_Usage_Logger', 'register']);
         add_action('admin_menu', ['PMFAI_Admin_Pages', 'register_menu']);
@@ -13,6 +17,7 @@ final class PMFAI_Plugin
         add_action('admin_enqueue_scripts', ['PMFAI_Assets', 'admin']);
         add_action('wp_enqueue_scripts', ['PMFAI_Assets', 'frontend']);
         add_action('rest_api_init', ['PMFAI_REST_API', 'register']);
+        add_action('rest_api_init', ['PMFAI_Page_Section_Regenerator', 'register_routes']);
     }
 
     public static function activate(): void
