@@ -10,6 +10,15 @@
     return fetch(PMFAI.restUrl + path, opts).then(function (res) { return res.json(); });
   }
 
+  function inputByKey(key) {
+    return document.querySelector('input[name="pmedia_flatsome_ai_toolkit_options[' + key + ']"]');
+  }
+
+  function fieldByKey(key) {
+    var input = inputByKey(key);
+    return input ? input.closest('.pmfai-field') : null;
+  }
+
   function insertProviderTester() {
     var providerSelect = document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[ai_provider]"]');
     if (!providerSelect || qs('pmfai-provider-test')) return;
@@ -23,14 +32,107 @@
   }
 
   function insertAnthropicMaxTokensField() {
-    var modelInput = document.querySelector('input[name="pmedia_flatsome_ai_toolkit_options[anthropic_model]"]');
-    if (!modelInput || document.querySelector('input[name="pmedia_flatsome_ai_toolkit_options[anthropic_max_tokens]"]')) return;
+    var modelInput = inputByKey('anthropic_model');
+    if (!modelInput || inputByKey('anthropic_max_tokens')) return;
     var label = document.createElement('label');
     label.className = 'pmfai-field';
-    label.innerHTML = '<span>Anthropic max tokens</span><input type="text" name="pmedia_flatsome_ai_toolkit_options[anthropic_max_tokens]" value="4096"><small>Gợi ý: 4096 cho bình thường, 8192+ cho Page Builder dài nếu model/gói hỗ trợ.</small>';
+    label.innerHTML = '<span>Anthropic max tokens</span><input type="text" name="pmedia_flatsome_ai_toolkit_options[anthropic_max_tokens]" value="4096"><small class="pmfai-provider-hint">Gợi ý: 4096 cho bình thường, 8192+ cho Page Builder dài nếu model/gói hỗ trợ.</small>';
     var modelField = modelInput.closest('.pmfai-field');
     if (modelField && modelField.parentNode) {
       modelField.parentNode.insertBefore(label, modelField.nextSibling);
+    }
+  }
+
+  function buildProviderGroups() {
+    var providerSelect = document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[ai_provider]"]');
+    if (!providerSelect || document.querySelector('.pmfai-provider-groups')) return;
+    insertAnthropicMaxTokensField();
+
+    var providerField = providerSelect.closest('.pmfai-field');
+    if (!providerField || !providerField.parentNode) return;
+
+    var warning = document.createElement('div');
+    warning.className = 'pmfai-provider-warning';
+    warning.id = 'pmfai-provider-warning';
+    providerField.parentNode.insertBefore(warning, providerField.nextSibling);
+
+    var groups = document.createElement('div');
+    groups.className = 'pmfai-provider-groups';
+    groups.innerHTML = '' +
+      '<div class="pmfai-provider-group" data-provider-group="openai"><h3>OpenAI / ChatGPT</h3><p>Dùng endpoint Chat Completions chính thức của OpenAI.</p></div>' +
+      '<div class="pmfai-provider-group" data-provider-group="openai_compatible"><h3>OpenAI-compatible</h3><p>Dùng cho OpenRouter, DeepSeek, Groq, Together, LM Studio proxy hoặc endpoint tương thích.</p></div>' +
+      '<div class="pmfai-provider-group" data-provider-group="anthropic"><h3>Anthropic Claude</h3><p>Dùng Claude Messages API. Phù hợp với prompt dài và copy/layout chất lượng cao.</p></div>';
+    providerField.parentNode.insertBefore(groups, warning.nextSibling);
+
+    var map = {
+      openai: ['api_endpoint', 'api_key', 'api_model'],
+      openai_compatible: ['compatible_endpoint', 'compatible_api_key', 'compatible_model'],
+      anthropic: ['anthropic_endpoint', 'anthropic_api_key', 'anthropic_model', 'anthropic_max_tokens']
+    };
+
+    Object.keys(map).forEach(function (provider) {
+      var group = groups.querySelector('[data-provider-group="' + provider + '"]');
+      map[provider].forEach(function (key) {
+        var field = fieldByKey(key);
+        if (field && group) {
+          group.appendChild(field);
+        }
+      });
+    });
+
+    addProviderHints();
+    providerSelect.addEventListener('change', refreshProviderGroups);
+    refreshProviderGroups();
+  }
+
+  function addProviderHints() {
+    var hints = {
+      api_endpoint: 'Mặc định: https://api.openai.com/v1/chat/completions',
+      api_model: 'Ví dụ: gpt-4.1-mini hoặc model OpenAI anh đang dùng.',
+      compatible_endpoint: 'Ví dụ OpenRouter: https://openrouter.ai/api/v1/chat/completions',
+      compatible_model: 'Ví dụ: deepseek/deepseek-chat, openai/gpt-4.1-mini, qwen/qwen3-coder.',
+      anthropic_endpoint: 'Mặc định: https://api.anthropic.com/v1/messages',
+      anthropic_model: 'Ví dụ: claude-3-5-sonnet-latest.',
+      anthropic_max_tokens: 'Tăng khi sinh page dài, nhưng token cao hơn có thể tốn phí hơn.'
+    };
+    Object.keys(hints).forEach(function (key) {
+      var field = fieldByKey(key);
+      if (!field || field.querySelector('.pmfai-provider-hint')) return;
+      var small = document.createElement('small');
+      small.className = 'pmfai-provider-hint';
+      small.textContent = hints[key];
+      field.appendChild(small);
+    });
+  }
+
+  function refreshProviderGroups() {
+    var providerSelect = document.querySelector('select[name="pmedia_flatsome_ai_toolkit_options[ai_provider]"]');
+    if (!providerSelect) return;
+    var active = providerSelect.value || 'openai';
+    document.querySelectorAll('.pmfai-provider-group').forEach(function (group) {
+      group.classList.toggle('is-active', group.getAttribute('data-provider-group') === active);
+    });
+
+    var keyMap = {
+      openai: ['api_endpoint', 'api_key', 'api_model'],
+      openai_compatible: ['compatible_endpoint', 'compatible_api_key', 'compatible_model'],
+      anthropic: ['anthropic_endpoint', 'anthropic_api_key', 'anthropic_model']
+    };
+    var missing = [];
+    (keyMap[active] || []).forEach(function (key) {
+      var input = inputByKey(key);
+      if (!input || !String(input.value || '').trim()) missing.push(key);
+    });
+
+    var warning = qs('pmfai-provider-warning');
+    if (warning) {
+      if (missing.length) {
+        warning.classList.remove('is-ok');
+        warning.textContent = 'Provider đang chọn còn thiếu cấu hình: ' + missing.join(', ') + '. Hãy điền và lưu Settings trước khi test/generate.';
+      } else {
+        warning.classList.add('is-ok');
+        warning.textContent = 'Provider đang chọn đã có đủ endpoint/API key/model. Hãy lưu Settings rồi bấm Test AI Provider để kiểm tra thực tế.';
+      }
     }
   }
 
@@ -90,7 +192,14 @@
   document.addEventListener('DOMContentLoaded', function () {
     insertProviderTester();
     insertAnthropicMaxTokensField();
+    buildProviderGroups();
     enhanceUsageLogs();
+  });
+
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.name && e.target.name.indexOf('pmedia_flatsome_ai_toolkit_options[') === 0) {
+      refreshProviderGroups();
+    }
   });
 
   document.addEventListener('click', function (e) {
