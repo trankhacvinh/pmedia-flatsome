@@ -7,22 +7,10 @@ final class PMFAI_AI_Service
     {
         $started = microtime(true);
         $options = PMFAI_Settings::get_options();
-        $api_key = trim((string)($options['api_key'] ?? ''));
-        if ($api_key === '') {
-            PMFAI_Usage_Logger::log([
-                'action' => 'generate-block',
-                'status' => 'error',
-                'mode' => sanitize_key($params['costMode'] ?? 'balanced'),
-                'type' => sanitize_key($params['type'] ?? 'generate-from-description'),
-                'industry' => sanitize_text_field($params['industry'] ?? ''),
-                'error_message' => 'Missing API key',
-            ]);
-            return new WP_Error('missing_api_key', 'Chưa cấu hình API key trong Settings.', ['status' => 400]);
-        }
-
+        $provider = PMFAI_AI_Provider_Manager::provider_id($options);
         $type = sanitize_key($params['type'] ?? 'generate-from-description');
         $cost_mode = sanitize_key($params['costMode'] ?? 'balanced');
-        $mode_config = self::mode_config($cost_mode, $options);
+        $mode_config = self::mode_config($cost_mode, $options, $provider);
 
         $content = sanitize_textarea_field($params['content'] ?? '');
         $content .= "\n\nCost/Quality mode: " . $mode_config['label'] . "\n" . $mode_config['instruction'];
@@ -34,22 +22,16 @@ final class PMFAI_AI_Service
             'content' => $content,
         ]);
 
-        $payload = [
+        $response = PMFAI_AI_Provider_Manager::complete([
+            'options' => $options,
+            'provider' => $provider,
             'model' => $mode_config['model'],
             'temperature' => $mode_config['temperature'],
+            'timeout' => $mode_config['timeout'],
             'messages' => [
                 ['role' => 'system', 'content' => $mode_config['system']],
                 ['role' => 'user', 'content' => $prompt],
             ],
-        ];
-
-        $response = wp_remote_post($options['api_endpoint'], [
-            'timeout' => $mode_config['timeout'],
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $api_key,
-            ],
-            'body' => wp_json_encode($payload),
         ]);
 
         $duration_ms = (int)round((microtime(true) - $started) * 1000);
@@ -68,29 +50,10 @@ final class PMFAI_AI_Service
             return $response;
         }
 
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $json = json_decode($body, true);
-        $usage = is_array($json['usage'] ?? null) ? $json['usage'] : [];
+        $content = (string)($response['content'] ?? '');
+        $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $code = (int)($response['http_code'] ?? 200);
 
-        if ($code < 200 || $code >= 300) {
-            $message = $json['error']['message'] ?? ('AI API error HTTP ' . $code);
-            PMFAI_Usage_Logger::log([
-                'action' => 'generate-block',
-                'status' => 'error',
-                'mode' => $cost_mode,
-                'model' => $mode_config['model'],
-                'type' => $type,
-                'industry' => sanitize_text_field($params['industry'] ?? ''),
-                'duration_ms' => $duration_ms,
-                'http_code' => $code,
-                'usage' => $usage,
-                'error_message' => $message,
-            ]);
-            return new WP_Error('api_error', $message, ['status' => 500]);
-        }
-
-        $content = $json['choices'][0]['message']['content'] ?? '';
         if (!$content) {
             PMFAI_Usage_Logger::log([
                 'action' => 'generate-block',
@@ -127,6 +90,7 @@ final class PMFAI_AI_Service
                 'prompt' => $prompt,
                 'cost_mode' => $cost_mode,
                 'model' => $mode_config['model'],
+                'provider' => $provider,
                 'usage' => $usage,
             ];
         }
@@ -148,13 +112,20 @@ final class PMFAI_AI_Service
         $parsed['source'] = 'auto-mode-' . $cost_mode;
         $parsed['cost_mode'] = $cost_mode;
         $parsed['model'] = $mode_config['model'];
+        $parsed['provider'] = $provider;
         $parsed['usage'] = $usage;
         return $parsed;
     }
 
-    private static function mode_config(string $mode, array $options): array
+    private static function mode_config(string $mode, array $options, string $provider = 'openai'): array
     {
-        $base_model = $options['api_model'] ?: 'gpt-4.1-mini';
+        if ($provider === 'anthropic') {
+            $base_model = $options['anthropic_model'] ?: 'claude-3-5-sonnet-latest';
+        } elseif ($provider === 'openai_compatible') {
+            $base_model = $options['compatible_model'] ?: ($options['api_model'] ?: 'gpt-4.1-mini');
+        } else {
+            $base_model = $options['api_model'] ?: 'gpt-4.1-mini';
+        }
         $base_temperature = is_numeric($options['temperature']) ? (float)$options['temperature'] : 0.4;
 
         $fast_model = trim((string)($options['fast_model'] ?? '')) ?: $base_model;
