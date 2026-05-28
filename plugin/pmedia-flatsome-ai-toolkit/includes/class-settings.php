@@ -16,6 +16,7 @@ final class PMFAI_Settings
             'anthropic_endpoint' => 'https://api.anthropic.com/v1/messages',
             'anthropic_api_key' => '',
             'anthropic_model' => 'claude-3-5-sonnet-latest',
+            'anthropic_max_tokens' => '4096',
             'temperature' => '0.4',
             'fast_model' => '',
             'fast_temperature' => '0.2',
@@ -69,6 +70,9 @@ final class PMFAI_Settings
                 $output[$key] = sanitize_textarea_field($value);
             } elseif ($key === 'enable_frontend_css') {
                 $output[$key] = !empty($value) ? '1' : '0';
+            } elseif ($key === 'anthropic_max_tokens') {
+                $tokens = absint($value);
+                $output[$key] = (string)max(512, min(20000, $tokens ?: (int)$default));
             } else {
                 $output[$key] = sanitize_text_field($value);
             }
