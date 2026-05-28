@@ -49,42 +49,24 @@ final class PMFAI_Design_System_AI
     {
         $started = microtime(true);
         $options = PMFAI_Settings::get_options();
-        $api_key = trim((string)($options['api_key'] ?? ''));
-        $model = $options['balanced_model'] ?: ($options['api_model'] ?: 'gpt-4.1-mini');
-
-        if ($api_key === '') {
-            PMFAI_Usage_Logger::log([
-                'action' => 'design-system-generate',
-                'status' => 'error',
-                'mode' => 'balanced',
-                'model' => $model,
-                'type' => 'design-system',
-                'error_message' => 'Missing API key',
-            ]);
-            return new WP_Error('missing_api_key', 'Chưa cấu hình API key trong Settings.', ['status' => 400]);
-        }
-
+        $provider = PMFAI_AI_Provider_Manager::provider_id($options);
+        $model = self::model($options, $provider);
+        $temperature = is_numeric($options['balanced_temperature']) ? (float)$options['balanced_temperature'] : 0.4;
         $prompt = self::bridge_prompt($params);
-        $payload = [
+
+        $response = PMFAI_AI_Provider_Manager::complete([
+            'options' => $options,
+            'provider' => $provider,
             'model' => $model,
-            'temperature' => is_numeric($options['balanced_temperature']) ? (float)$options['balanced_temperature'] : 0.4,
+            'temperature' => $temperature,
+            'timeout' => 90,
             'messages' => [
                 ['role' => 'system', 'content' => 'You create strict JSON design systems for WordPress Flatsome. Return valid JSON only.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
-        ];
-
-        $response = wp_remote_post($options['api_endpoint'], [
-            'timeout' => 90,
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $api_key,
-            ],
-            'body' => wp_json_encode($payload),
         ]);
 
         $duration_ms = (int)round((microtime(true) - $started) * 1000);
-
         if (is_wp_error($response)) {
             PMFAI_Usage_Logger::log([
                 'action' => 'design-system-generate',
@@ -98,29 +80,10 @@ final class PMFAI_Design_System_AI
             return $response;
         }
 
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $json = json_decode($body, true);
-        $usage = is_array($json['usage'] ?? null) ? $json['usage'] : [];
-
-        if ($code < 200 || $code >= 300) {
-            $message = $json['error']['message'] ?? ('AI API error HTTP ' . $code);
-            PMFAI_Usage_Logger::log([
-                'action' => 'design-system-generate',
-                'status' => 'error',
-                'mode' => 'balanced',
-                'model' => $model,
-                'type' => 'design-system',
-                'duration_ms' => $duration_ms,
-                'http_code' => $code,
-                'usage' => $usage,
-                'error_message' => $message,
-            ]);
-            return new WP_Error('api_error', $message, ['status' => 500]);
-        }
-
-        $content = trim((string)($json['choices'][0]['message']['content'] ?? ''));
-        $parsed = self::parse_json($content, ['raw' => $content, 'prompt' => $prompt, 'usage' => $usage, 'model' => $model, 'cost_mode' => 'balanced']);
+        $content = trim((string)($response['content'] ?? ''));
+        $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $code = (int)($response['http_code'] ?? 200);
+        $parsed = self::parse_json($content, ['raw' => $content, 'prompt' => $prompt, 'usage' => $usage, 'model' => $model, 'provider' => $provider, 'cost_mode' => 'balanced']);
 
         PMFAI_Usage_Logger::log([
             'action' => 'design-system-generate',
@@ -135,6 +98,13 @@ final class PMFAI_Design_System_AI
         ]);
 
         return $parsed;
+    }
+
+    private static function model(array $options, string $provider): string
+    {
+        $override = trim((string)($options['balanced_model'] ?? ''));
+        if ($override !== '') { return $override; }
+        return PMFAI_AI_Provider_Manager::model($provider, $options);
     }
 
     public static function parse_json(string $raw, array $extra = [])
