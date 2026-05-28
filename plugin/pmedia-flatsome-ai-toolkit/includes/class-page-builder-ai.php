@@ -74,38 +74,55 @@ final class PMFAI_Page_Builder_AI
     {
         $started = microtime(true);
         $options = PMFAI_Settings::get_options();
-        $api_key = trim((string)($options['api_key'] ?? ''));
+        $provider = PMFAI_AI_Provider_Manager::provider_id($options);
         $mode = sanitize_key($params['costMode'] ?? 'balanced');
-        $mode_config = self::mode_config($mode, $options);
+        $mode_config = self::mode_config($mode, $options, $provider);
         $build_mode = sanitize_key($params['buildMode'] ?? 'full-page');
         $output_mode = self::output_mode($params['outputMode'] ?? 'html-block');
-        if ($api_key === '') {
-            PMFAI_Usage_Logger::log(['action'=>'page-builder-generate','status'=>'error','mode'=>$mode,'model'=>$mode_config['model'],'type'=>$build_mode . '/' . $output_mode,'error_message'=>'Missing API key']);
-            return new WP_Error('missing_api_key', 'Chưa cấu hình API key trong Settings.', ['status' => 400]);
-        }
         $prompt = self::bridge_prompt($params);
-        $payload = ['model'=>$mode_config['model'],'temperature'=>$mode_config['temperature'],'messages'=>[
-            ['role'=>'system','content'=>'You generate strict valid JSON page structures for WordPress Flatsome. Always choose section patterns from the provided Pattern Library. Return JSON only.'],
-            ['role'=>'user','content'=>$prompt],
-        ]];
-        $response = wp_remote_post($options['api_endpoint'], ['timeout'=>$mode_config['timeout'],'headers'=>['Content-Type'=>'application/json','Authorization'=>'Bearer ' . $api_key],'body'=>wp_json_encode($payload)]);
+
+        $response = PMFAI_AI_Provider_Manager::complete([
+            'options' => $options,
+            'provider' => $provider,
+            'model' => $mode_config['model'],
+            'temperature' => $mode_config['temperature'],
+            'timeout' => $mode_config['timeout'],
+            'messages' => [
+                ['role' => 'system', 'content' => 'You generate strict valid JSON page structures for WordPress Flatsome. Always choose section patterns from the provided Pattern Library. Return JSON only.'],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+        ]);
+
         $duration_ms = (int)round((microtime(true) - $started) * 1000);
         if (is_wp_error($response)) {
             PMFAI_Usage_Logger::log(['action'=>'page-builder-generate','status'=>'error','mode'=>$mode,'model'=>$mode_config['model'],'type'=>$build_mode . '/' . $output_mode,'duration_ms'=>$duration_ms,'error_message'=>$response->get_error_message()]);
             return $response;
         }
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $json = json_decode($body, true);
-        $usage = is_array($json['usage'] ?? null) ? $json['usage'] : [];
-        if ($code < 200 || $code >= 300) {
-            $message = $json['error']['message'] ?? ('AI API error HTTP ' . $code);
-            PMFAI_Usage_Logger::log(['action'=>'page-builder-generate','status'=>'error','mode'=>$mode,'model'=>$mode_config['model'],'type'=>$build_mode . '/' . $output_mode,'duration_ms'=>$duration_ms,'http_code'=>$code,'usage'=>$usage,'error_message'=>$message]);
-            return new WP_Error('api_error', $message, ['status' => 500]);
-        }
-        $content = trim((string)($json['choices'][0]['message']['content'] ?? ''));
-        $parsed = self::parse_json($content, ['raw'=>$content,'prompt'=>$prompt,'usage'=>$usage,'cost_mode'=>$mode,'model'=>$mode_config['model'],'output_mode'=>$output_mode]);
-        PMFAI_Usage_Logger::log(['action'=>'page-builder-generate','status'=>is_wp_error($parsed) ? 'error' : 'success','mode'=>$mode,'model'=>$mode_config['model'],'type'=>$build_mode . '/' . $output_mode,'duration_ms'=>$duration_ms,'http_code'=>$code,'usage'=>$usage,'error_message'=>is_wp_error($parsed) ? $parsed->get_error_message() : '']);
+
+        $content = trim((string)($response['content'] ?? ''));
+        $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $code = (int)($response['http_code'] ?? 200);
+        $parsed = self::parse_json($content, [
+            'raw' => $content,
+            'prompt' => $prompt,
+            'usage' => $usage,
+            'cost_mode' => $mode,
+            'model' => $mode_config['model'],
+            'provider' => $provider,
+            'output_mode' => $output_mode,
+        ]);
+
+        PMFAI_Usage_Logger::log([
+            'action' => 'page-builder-generate',
+            'status' => is_wp_error($parsed) ? 'error' : 'success',
+            'mode' => $mode,
+            'model' => $mode_config['model'],
+            'type' => $build_mode . '/' . $output_mode,
+            'duration_ms' => $duration_ms,
+            'http_code' => $code,
+            'usage' => $usage,
+            'error_message' => is_wp_error($parsed) ? $parsed->get_error_message() : '',
+        ]);
         return $parsed;
     }
 
@@ -235,9 +252,16 @@ final class PMFAI_Page_Builder_AI
 
     private static function output_mode(string $mode): string { return $mode === 'flatsome-native' ? 'flatsome-native' : 'html-block'; }
 
-    private static function mode_config(string $mode, array $options): array
+    private static function mode_config(string $mode, array $options, string $provider = 'openai'): array
     {
-        $base_model = $options['api_model'] ?: 'gpt-4.1-mini'; $base_temperature = is_numeric($options['temperature']) ? (float)$options['temperature'] : 0.4;
+        if ($provider === 'anthropic') {
+            $base_model = $options['anthropic_model'] ?: 'claude-3-5-sonnet-latest';
+        } elseif ($provider === 'openai_compatible') {
+            $base_model = $options['compatible_model'] ?: ($options['api_model'] ?: 'gpt-4.1-mini');
+        } else {
+            $base_model = $options['api_model'] ?: 'gpt-4.1-mini';
+        }
+        $base_temperature = is_numeric($options['temperature']) ? (float)$options['temperature'] : 0.4;
         $configs = ['fast'=>['model'=>trim((string)($options['fast_model'] ?? '')) ?: $base_model,'temperature'=>is_numeric($options['fast_temperature'] ?? null) ? (float)$options['fast_temperature'] : 0.2,'timeout'=>90],'balanced'=>['model'=>trim((string)($options['balanced_model'] ?? '')) ?: $base_model,'temperature'=>is_numeric($options['balanced_temperature'] ?? null) ? (float)$options['balanced_temperature'] : $base_temperature,'timeout'=>120],'high'=>['model'=>trim((string)($options['high_model'] ?? '')) ?: $base_model,'temperature'=>is_numeric($options['high_temperature'] ?? null) ? (float)$options['high_temperature'] : 0.65,'timeout'=>180]];
         return $configs[$mode] ?? $configs['balanced'];
     }
