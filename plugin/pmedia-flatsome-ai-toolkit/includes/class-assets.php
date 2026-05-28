@@ -5,7 +5,10 @@ final class PMFAI_Assets
 {
     public static function admin($hook): void
     {
-        if (strpos((string)$hook, 'pmfai') === false && strpos((string)$hook, 'pmedia-ai-builder') === false) {
+        $is_pmfai_screen = strpos((string)$hook, 'pmfai') !== false || strpos((string)$hook, 'pmedia-ai-builder') !== false;
+        $is_page_edit = in_array((string)$hook, ['post.php', 'post-new.php'], true) && self::is_page_edit_screen();
+
+        if (!$is_pmfai_screen && !$is_page_edit) {
             return;
         }
 
@@ -17,7 +20,23 @@ final class PMFAI_Assets
             'tokens' => self::tokens_array(),
             'tokensCss' => self::tokens_css(),
         ]);
-        wp_enqueue_script('pmfai-page-builder-output-mode', PMFAI_URL . 'assets/js/page-builder-output-mode.js', ['pmfai-admin'], PMFAI_VERSION, true);
+
+        if ($is_pmfai_screen) {
+            wp_enqueue_script('pmfai-page-builder-output-mode', PMFAI_URL . 'assets/js/page-builder-output-mode.js', ['pmfai-admin'], PMFAI_VERSION, true);
+        }
+
+        if ($is_page_edit) {
+            wp_enqueue_script('pmfai-page-insert-box', PMFAI_URL . 'assets/js/page-insert-box.js', ['pmfai-admin'], PMFAI_VERSION, true);
+        }
+    }
+
+    private static function is_page_edit_screen(): bool
+    {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if ($screen && $screen->post_type === 'page') {
+            return true;
+        }
+        return isset($_GET['post_type']) && sanitize_key((string)$_GET['post_type']) === 'page';
     }
 
     public static function frontend(): void
