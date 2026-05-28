@@ -22,37 +22,28 @@ final class PMFAI_Page_Section_Regenerator
     {
         $started = microtime(true);
         $options = PMFAI_Settings::get_options();
-        $api_key = trim((string)($options['api_key'] ?? ''));
+        $provider = PMFAI_AI_Provider_Manager::provider_id($options);
         $page = is_array($params['page'] ?? null) ? $params['page'] : [];
         $section = is_array($params['section'] ?? null) ? $params['section'] : [];
         $mode = sanitize_key($params['costMode'] ?? 'balanced');
         $output_mode = self::output_mode((string)($params['outputMode'] ?? ($page['output_mode'] ?? 'html-block')));
-        $mode_config = self::mode_config($mode, $options);
+        $mode_config = self::mode_config($mode, $options, $provider);
 
-        if ($api_key === '') {
-            return new WP_Error('missing_api_key', 'Chưa cấu hình API key trong Settings.', ['status' => 400]);
-        }
         if (!$page || !$section) {
             return new WP_Error('invalid_input', 'Thiếu dữ liệu page hoặc section.', ['status' => 400]);
         }
 
         $prompt = self::prompt($page, $section, $params, $output_mode);
-        $payload = [
+        $response = PMFAI_AI_Provider_Manager::complete([
+            'options' => $options,
+            'provider' => $provider,
             'model' => $mode_config['model'],
             'temperature' => $mode_config['temperature'],
+            'timeout' => $mode_config['timeout'],
             'messages' => [
                 ['role' => 'system', 'content' => 'You generate exactly one strict valid JSON section object for WordPress Flatsome. Return JSON only.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
-        ];
-
-        $response = wp_remote_post($options['api_endpoint'], [
-            'timeout' => $mode_config['timeout'],
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $api_key,
-            ],
-            'body' => wp_json_encode($payload),
         ]);
 
         $duration_ms = (int)round((microtime(true) - $started) * 1000);
@@ -69,27 +60,9 @@ final class PMFAI_Page_Section_Regenerator
             return $response;
         }
 
-        $code = wp_remote_retrieve_response_code($response);
-        $body = wp_remote_retrieve_body($response);
-        $json = json_decode($body, true);
-        $usage = is_array($json['usage'] ?? null) ? $json['usage'] : [];
-        if ($code < 200 || $code >= 300) {
-            $message = $json['error']['message'] ?? ('AI API error HTTP ' . $code);
-            PMFAI_Usage_Logger::log([
-                'action' => 'page-builder-regenerate-section',
-                'status' => 'error',
-                'mode' => $mode,
-                'model' => $mode_config['model'],
-                'type' => $output_mode,
-                'duration_ms' => $duration_ms,
-                'http_code' => $code,
-                'usage' => $usage,
-                'error_message' => $message,
-            ]);
-            return new WP_Error('api_error', $message, ['status' => 500]);
-        }
-
-        $content = trim((string)($json['choices'][0]['message']['content'] ?? ''));
+        $content = trim((string)($response['content'] ?? ''));
+        $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+        $code = (int)($response['http_code'] ?? 200);
         $section_data = self::parse_section_json($content);
         if (is_wp_error($section_data)) {
             PMFAI_Usage_Logger::log([
@@ -143,6 +116,7 @@ final class PMFAI_Page_Section_Regenerator
             'visual_quality' => $visual_quality,
             'usage' => $usage,
             'model' => $mode_config['model'],
+            'provider' => $provider,
             'cost_mode' => $mode,
             'output_mode' => $output_mode,
         ];
@@ -209,9 +183,15 @@ final class PMFAI_Page_Section_Regenerator
         return $mode === 'flatsome-native' ? 'flatsome-native' : 'html-block';
     }
 
-    private static function mode_config(string $mode, array $options): array
+    private static function mode_config(string $mode, array $options, string $provider = 'openai'): array
     {
-        $base_model = $options['api_model'] ?: 'gpt-4.1-mini';
+        if ($provider === 'anthropic') {
+            $base_model = $options['anthropic_model'] ?: 'claude-3-5-sonnet-latest';
+        } elseif ($provider === 'openai_compatible') {
+            $base_model = $options['compatible_model'] ?: ($options['api_model'] ?: 'gpt-4.1-mini');
+        } else {
+            $base_model = $options['api_model'] ?: 'gpt-4.1-mini';
+        }
         $base_temperature = is_numeric($options['temperature']) ? (float)$options['temperature'] : 0.4;
         $configs = [
             'fast' => ['model' => trim((string)($options['fast_model'] ?? '')) ?: $base_model, 'temperature' => is_numeric($options['fast_temperature'] ?? null) ? (float)$options['fast_temperature'] : 0.2, 'timeout' => 90],
