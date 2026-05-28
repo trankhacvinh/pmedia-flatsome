@@ -13,16 +13,47 @@ final class PMFAI_AI_Provider_Manager
     public static function complete(array $request)
     {
         $options = $request['options'] ?? PMFAI_Settings::get_options();
-        $provider_id = sanitize_key($request['provider'] ?? self::provider_id($options));
-        $provider = self::provider($provider_id);
-        if (is_wp_error($provider)) { return $provider; }
+        $primary = sanitize_key($request['provider'] ?? self::provider_id($options));
+        $providers = [$primary];
 
+        $fallback_enabled = !empty($request['allow_fallback']) || (($options['enable_provider_fallback'] ?? '0') === '1');
+        $fallback = sanitize_key($options['fallback_provider'] ?? '');
+        if ($fallback_enabled && $fallback && $fallback !== $primary && in_array($fallback, ['openai', 'openai_compatible', 'anthropic'], true)) {
+            $providers[] = $fallback;
+        }
+
+        $last_error = null;
+        foreach ($providers as $index => $provider_id) {
+            $attempt = self::prepare_request_for_provider($request, $options, $provider_id);
+            $provider = self::provider($provider_id);
+            if (is_wp_error($provider)) {
+                $last_error = $provider;
+                continue;
+            }
+
+            $result = $provider->complete($attempt);
+            if (!is_wp_error($result)) {
+                $result['provider'] = $provider_id;
+                $result['provider_label'] = self::provider_label($provider_id);
+                $result['fallback_used'] = $index > 0;
+                $result['primary_provider'] = $primary;
+                return $result;
+            }
+
+            $last_error = $result;
+            if (!$fallback_enabled) { break; }
+        }
+
+        return $last_error ?: new WP_Error('provider_error', 'Không gọi được AI provider.', ['status' => 500]);
+    }
+
+    private static function prepare_request_for_provider(array $request, array $options, string $provider_id): array
+    {
         $request['provider'] = $provider_id;
-        $request['endpoint'] = self::endpoint($provider_id, $options, $request);
-        $request['api_key'] = self::api_key($provider_id, $options, $request);
+        $request['endpoint'] = self::endpoint($provider_id, $options, []);
+        $request['api_key'] = self::api_key($provider_id, $options, []);
         $request['model'] = self::model($provider_id, $options, $request);
-
-        return $provider->complete($request);
+        return $request;
     }
 
     public static function endpoint(string $provider_id, array $options, array $request = []): string
