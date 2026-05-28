@@ -15,6 +15,10 @@ final class PMFAI_REST_API
         register_rest_route('pmedia-ai/v1', '/page-builder/generate', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_generate'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/page-builder/import', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_import'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/page-builder/create-draft', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_builder_create_draft'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-insert/context/(?P<id>\d+)', ['methods' => 'GET', 'callback' => [__CLASS__, 'page_insert_context'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-insert/generate', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_insert_generate'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-insert/bridge-prompt', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_insert_bridge_prompt'], 'permission_callback' => [__CLASS__, 'can_manage']]);
+        register_rest_route('pmedia-ai/v1', '/page-insert/apply', ['methods' => 'POST', 'callback' => [__CLASS__, 'page_insert_apply'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/parse-chatgpt-block', ['methods' => 'POST', 'callback' => [__CLASS__, 'parse_chatgpt_block'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/validate-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'validate_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
         register_rest_route('pmedia-ai/v1', '/auto-fix-code', ['methods' => 'POST', 'callback' => [__CLASS__, 'auto_fix_code'], 'permission_callback' => [__CLASS__, 'can_manage']]);
@@ -79,13 +83,63 @@ final class PMFAI_REST_API
 
     public static function page_builder_import(WP_REST_Request $request)
     {
-        $result = PMFAI_Page_Builder_AI::parse_json($request->get_param('raw') ?: '');
+        $params = $request->get_json_params() ?: [];
+        $result = PMFAI_Page_Builder_AI::parse_json($request->get_param('raw') ?: '', ['output_mode' => sanitize_key($params['outputMode'] ?? 'html-block')]);
         return is_wp_error($result) ? $result : rest_ensure_response($result);
     }
 
     public static function page_builder_create_draft(WP_REST_Request $request)
     {
         $result = PMFAI_Page_Builder_AI::create_draft($request->get_json_params() ?: []);
+        return is_wp_error($result) ? $result : rest_ensure_response($result);
+    }
+
+    public static function page_insert_context(WP_REST_Request $request)
+    {
+        $post_id = absint($request['id']);
+        if (!current_user_can('edit_post', $post_id)) {
+            return new WP_Error('forbidden', 'Bạn không có quyền đọc page này.', ['status' => 403]);
+        }
+        return rest_ensure_response(PMFAI_Page_Insert_Box::build_context($post_id));
+    }
+
+    public static function page_insert_bridge_prompt(WP_REST_Request $request)
+    {
+        $params = $request->get_json_params() ?: [];
+        $post_id = absint($params['postId'] ?? 0);
+        $context = PMFAI_Page_Insert_Box::build_context($post_id);
+        $brief = trim((string)($params['brief'] ?? ''));
+        $params['buildMode'] = 'single-section';
+        $params['brief'] = "Trang hiện tại: " . ($context['title'] ?? '') . "\nSection count: " . ($context['section_count'] ?? 0) . "\nTóm tắt nội dung hiện tại: " . ($context['content_excerpt'] ?? '') . "\n\nYêu cầu thêm/sửa section:\n" . $brief;
+        return rest_ensure_response(['prompt' => PMFAI_Page_Builder_AI::bridge_prompt($params), 'context' => $context]);
+    }
+
+    public static function page_insert_generate(WP_REST_Request $request)
+    {
+        $params = $request->get_json_params() ?: [];
+        $post_id = absint($params['postId'] ?? 0);
+        if (!current_user_can('edit_post', $post_id)) {
+            return new WP_Error('forbidden', 'Bạn không có quyền sửa page này.', ['status' => 403]);
+        }
+        $context = PMFAI_Page_Insert_Box::build_context($post_id);
+        $brief = trim((string)($params['brief'] ?? ''));
+        $params['buildMode'] = 'single-section';
+        $params['brief'] = "Bạn đang hỗ trợ bổ sung section cho một page WordPress Flatsome hiện có.\n\nTrang hiện tại: " . ($context['title'] ?? '') . "\nSlug: " . ($context['slug'] ?? '') . "\nSố section hiện tại: " . ($context['section_count'] ?? 0) . "\nTóm tắt nội dung hiện tại: " . ($context['content_excerpt'] ?? '') . "\n\nYêu cầu section mới:\n" . $brief;
+        $generated = PMFAI_Page_Builder_AI::generate($params);
+        if (is_wp_error($generated)) { return $generated; }
+        $shortcode = (string)($generated['shortcode'] ?? '');
+        if (!empty($params['autoApply'])) {
+            $applied = PMFAI_Page_Insert_Box::apply_content($post_id, $shortcode, sanitize_key($params['action'] ?? 'append'));
+            if (is_wp_error($applied)) { return $applied; }
+            $generated['applied'] = $applied;
+        }
+        return rest_ensure_response($generated);
+    }
+
+    public static function page_insert_apply(WP_REST_Request $request)
+    {
+        $params = $request->get_json_params() ?: [];
+        $result = PMFAI_Page_Insert_Box::apply_content(absint($params['postId'] ?? 0), (string)($params['shortcode'] ?? ''), sanitize_key($params['action'] ?? 'append'));
         return is_wp_error($result) ? $result : rest_ensure_response($result);
     }
 
@@ -107,23 +161,12 @@ final class PMFAI_REST_API
 
     public static function usage_logs(WP_REST_Request $request)
     {
-        return rest_ensure_response(PMFAI_Usage_Logger::list([
-            'posts_per_page' => $request->get_param('per_page') ?: 50,
-            'paged' => $request->get_param('page') ?: 1,
-            'status' => $request->get_param('status') ?: '',
-            'mode' => $request->get_param('mode') ?: '',
-        ]));
+        return rest_ensure_response(PMFAI_Usage_Logger::list(['posts_per_page'=>$request->get_param('per_page') ?: 50,'paged'=>$request->get_param('page') ?: 1,'status'=>$request->get_param('status') ?: '','mode'=>$request->get_param('mode') ?: '']));
     }
 
     public static function list_blocks(WP_REST_Request $request)
     {
-        return rest_ensure_response(PMFAI_Block_Library::list([
-            'posts_per_page' => $request->get_param('per_page') ?: 30,
-            'paged' => $request->get_param('page') ?: 1,
-            's' => $request->get_param('s') ?: '',
-            'type' => $request->get_param('type') ?: '',
-            'industry' => $request->get_param('industry') ?: '',
-        ]));
+        return rest_ensure_response(PMFAI_Block_Library::list(['posts_per_page'=>$request->get_param('per_page') ?: 30,'paged'=>$request->get_param('page') ?: 1,'s'=>$request->get_param('s') ?: '','type'=>$request->get_param('type') ?: '','industry'=>$request->get_param('industry') ?: '']));
     }
 
     public static function save_block(WP_REST_Request $request)
