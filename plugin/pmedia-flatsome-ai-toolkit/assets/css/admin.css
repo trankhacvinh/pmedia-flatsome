@@ -50,6 +50,17 @@
 .pmfai-status-box a{font-weight:800;text-decoration:none}
 .pmfai-created-page-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 
+#pmfai-page-insert-box .inside{padding:0 12px 12px}
+.pmfai-insert-box{font-size:13px;color:#1f2937}
+.pmfai-insert-box label{display:block;margin:12px 0}
+.pmfai-insert-box label span{display:block;font-weight:700;margin-bottom:6px;color:#374151}
+.pmfai-insert-box select,.pmfai-insert-box textarea{width:100%;max-width:100%;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#111827;box-shadow:none}
+.pmfai-insert-box select{min-height:36px;padding:5px 8px}
+.pmfai-insert-box textarea{min-height:120px;padding:8px;font-family:Menlo,Consolas,Monaco,monospace;resize:vertical}
+.pmfai-insert-summary{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px;color:#1e3a8a}
+.pmfai-insert-excerpt{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;color:#475569;max-height:110px;overflow:auto}
+.pmfai-insert-shortcode{width:100%;min-height:160px;font-family:Menlo,Consolas,Monaco,monospace;border:1px solid #cbd5e1;border-radius:8px;padding:8px}
+
 .pmfai-library-detail:empty{display:none}
 .pmfai-library-table td,.pmfai-usage-table td{vertical-align:top}
 .pmfai-library-table .button{margin:0 4px 4px 0}
