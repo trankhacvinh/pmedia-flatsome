@@ -58,17 +58,14 @@ document.addEventListener('click', async function (e) {
     }
     await withLoading(t, 'Đang apply...', async () => {
       const r = await pmfaiFetch('/design-system/apply', 'POST', data);
-      if (r.applied) {
-        html('pmfai-ds-result', '<div class="pmfai-status-box is-success">Đã apply Design System vào Settings. Refresh trang để admin preview nhận token mới nhất.</div>' + renderDesignSystemResult(r));
-      } else {
-        html('pmfai-ds-result', renderDesignSystemResult(r));
-      }
+      if (r.applied) html('pmfai-ds-result', '<div class="pmfai-status-box is-success">Đã apply Design System vào Settings. Refresh trang để admin preview nhận token mới nhất.</div>' + renderDesignSystemResult(r));
+      else html('pmfai-ds-result', renderDesignSystemResult(r));
     });
   }
 
   if (t.id === 'pmfai-page-bridge') {
     e.preventDefault();
-    const r = await pmfaiFetch('/page-builder/bridge-prompt', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode')});
+    const r = await pmfaiFetch('/page-builder/bridge-prompt', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), outputMode: val('pmfai-page-output-mode')});
     setVal('pmfai-page-prompt', r.prompt || '');
   }
 
@@ -76,7 +73,7 @@ document.addEventListener('click', async function (e) {
     e.preventDefault();
     pmfaiLastCreatedDraftId = null;
     await withLoading(t, 'Đang generate...', async () => {
-      const j = await pmfaiFetch('/page-builder/generate', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), costMode: val('pmfai-page-cost-mode')});
+      const j = await pmfaiFetch('/page-builder/generate', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), costMode: val('pmfai-page-cost-mode'), outputMode: val('pmfai-page-output-mode')});
       pmfaiLastPage = j.code ? null : j;
       setVal('pmfai-page-json', j.page ? JSON.stringify({version: j.version || '1.0', page: j.page}, null, 2) : (j.raw || ''));
       html('pmfai-page-result', renderPageResult(j));
@@ -87,7 +84,7 @@ document.addEventListener('click', async function (e) {
   if (t.id === 'pmfai-page-import') {
     e.preventDefault();
     pmfaiLastCreatedDraftId = null;
-    const j = await pmfaiFetch('/page-builder/import', 'POST', {raw: val('pmfai-page-json')});
+    const j = await pmfaiFetch('/page-builder/import', 'POST', {raw: val('pmfai-page-json'), outputMode: val('pmfai-page-output-mode')});
     pmfaiLastPage = j.code ? null : j;
     html('pmfai-page-result', renderPageResult(j));
     renderAllPreviewIframes();
@@ -100,9 +97,7 @@ document.addEventListener('click', async function (e) {
       return;
     }
     let data = pmfaiLastPage;
-    if (!data) {
-      try { data = JSON.parse(val('pmfai-page-json')); } catch (err) { alert('JSON không hợp lệ: ' + err.message); return; }
-    }
+    if (!data) { try { data = JSON.parse(val('pmfai-page-json')); } catch (err) { alert('JSON không hợp lệ: ' + err.message); return; } }
     await withLoading(t, 'Đang tạo draft...', async () => {
       const r = await pmfaiFetch('/page-builder/create-draft', 'POST', data);
       if (r.created) {
@@ -110,9 +105,7 @@ document.addEventListener('click', async function (e) {
         t.classList.add('is-disabled');
         const notice = '<div class="pmfai-status-box is-success"><strong>Đã tạo Page Draft #' + r.post_id + ' thành công.</strong><div class="pmfai-created-page-actions"><a class="button button-primary" href="' + pmfaiAttr(r.edit_url || '#') + '" target="_blank">Mở trang chỉnh sửa</a><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(r.shortcode || '') + '">Copy Shortcode</button></div></div>';
         html('pmfai-page-notice', notice);
-      } else {
-        html('pmfai-page-notice', renderError(r));
-      }
+      } else html('pmfai-page-notice', renderError(r));
     });
   }
 
@@ -120,9 +113,7 @@ document.addEventListener('click', async function (e) {
     e.preventDefault();
     await withLoading(t, 'Đang generate...', async () => {
       html('pmfai-generate-result', '<div class="notice notice-info"><p>Đang gọi AI API. Vui lòng không tắt trang.</p></div>');
-      const j = await pmfaiFetch('/generate-block', 'POST', {
-        type: val('pmfai-generate-type'), costMode: val('pmfai-generate-cost-mode'), industry: val('pmfai-generate-industry'), style: val('pmfai-generate-style'), goal: val('pmfai-generate-goal'), content: val('pmfai-generate-content')
-      });
+      const j = await pmfaiFetch('/generate-block', 'POST', {type: val('pmfai-generate-type'), costMode: val('pmfai-generate-cost-mode'), industry: val('pmfai-generate-industry'), style: val('pmfai-generate-style'), goal: val('pmfai-generate-goal'), content: val('pmfai-generate-content')});
       pmfaiLastParsedBlock = j.code ? null : j;
       html('pmfai-generate-result', renderPmfaiResult(j, true, true));
       renderAllPreviewIframes();
@@ -179,15 +170,12 @@ document.addEventListener('click', async function (e) {
   }
 
   if (t.classList.contains('pmfai-view-block')) { e.preventDefault(); const block = await pmfaiFetch('/blocks/' + t.dataset.id, 'GET'); html('pmfai-library-detail', renderLibraryDetail(block)); renderAllPreviewIframes(); }
-
   if (t.classList.contains('pmfai-save-block-meta')) {
     e.preventDefault();
     const id = t.dataset.id;
     const updated = await pmfaiFetch('/blocks/' + id, 'PUT', {title: val('pmfai-edit-title'), type: val('pmfai-edit-type'), style: val('pmfai-edit-style'), industry: val('pmfai-edit-industry'), tags: val('pmfai-edit-tags'), description: val('pmfai-edit-description'), html: val('pmfai-edit-html'), css: val('pmfai-edit-css'), js: val('pmfai-edit-js')});
-    html('pmfai-library-detail', renderLibraryDetail(updated));
-    await loadPmfaiLibrary(); renderAllPreviewIframes();
+    html('pmfai-library-detail', renderLibraryDetail(updated)); await loadPmfaiLibrary(); renderAllPreviewIframes();
   }
-
   if (t.classList.contains('pmfai-duplicate-block')) { e.preventDefault(); const duplicated = await pmfaiFetch('/blocks/' + t.dataset.id + '/duplicate', 'POST', {}); if (duplicated.id) { alert('Đã duplicate thành block #' + duplicated.id); await loadPmfaiLibrary(); } }
   if (t.classList.contains('pmfai-export-block')) { e.preventDefault(); const exported = await pmfaiFetch('/blocks/' + t.dataset.id + '/export', 'GET'); if (exported.id) { copyText(JSON.stringify(exported, null, 2), t); } }
   if (t.classList.contains('pmfai-delete-block')) { e.preventDefault(); if (!confirm('Xóa block này khỏi Library?')) return; await pmfaiFetch('/blocks/' + t.dataset.id, 'DELETE'); await loadPmfaiLibrary(); }
@@ -211,18 +199,11 @@ function enhanceColorFields() {
     const name = input.getAttribute('name') || '';
     const key = colorNames.find(k => name.indexOf('[' + k + ']') !== -1);
     if (!key || input.closest('.pmfai-color-field')) return;
-    const label = input.closest('.pmfai-field');
-    if (!label) return;
+    const label = input.closest('.pmfai-field'); if (!label) return;
     label.classList.add('pmfai-color-field');
-    const picker = document.createElement('input');
-    picker.type = 'color';
-    picker.className = 'pmfai-color-input-native';
-    picker.value = isHexColor(input.value) ? input.value : '#ffffff';
+    const picker = document.createElement('input'); picker.type = 'color'; picker.className = 'pmfai-color-input-native'; picker.value = isHexColor(input.value) ? input.value : '#ffffff';
     input.parentNode.appendChild(picker);
-    const swatch = document.createElement('span');
-    swatch.className = 'pmfai-color-swatch';
-    swatch.style.background = isHexColor(input.value) ? input.value : '#ffffff';
-    picker.parentNode.insertBefore(swatch, picker);
+    const swatch = document.createElement('span'); swatch.className = 'pmfai-color-swatch'; swatch.style.background = isHexColor(input.value) ? input.value : '#ffffff'; picker.parentNode.insertBefore(swatch, picker);
     input.addEventListener('input', () => { if (isHexColor(input.value)) { picker.value = input.value; swatch.style.background = input.value; } });
     picker.addEventListener('input', () => { input.value = picker.value.toUpperCase(); swatch.style.background = picker.value; });
   });
@@ -270,9 +251,11 @@ function renderPageResult(j) {
   if (j.code && j.message) return renderError(j);
   const page = j.page || {};
   let h = '<div id="pmfai-page-notice"></div><div class="pmfai-result"><h2>' + pmfaiEsc(page.title || 'Generated Page') + '</h2><p>' + pmfaiEsc(page.description || '') + '</p>';
-  if (j.cost_mode || j.model) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
+  if (j.cost_mode || j.model || j.output_mode || page.output_mode) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Output: ' + pmfaiEsc(j.output_mode || page.output_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
+  if (j.visual_quality) h += '<div class="pmfai-quality-box"><strong>Visual Quality Score: ' + (j.visual_quality.score || 0) + '/100</strong></div>';
   if (j.warnings && j.warnings.length) h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
-  (page.sections || []).forEach(s => { h += '<div class="pmfai-page-section-preview"><h3>' + pmfaiEsc(s.title || s.id || 'Section') + '</h3><p>' + pmfaiEsc(s.goal || '') + '</p>' + renderPreviewBox(s.html || '', s.css || '') + '</div>'; });
+  if (j.suggestions && j.suggestions.length) h += '<h3>Gợi ý cải thiện layout</h3><ul>' + j.suggestions.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
+  (page.sections || []).forEach(s => { h += '<div class="pmfai-page-section-preview"><h3>' + pmfaiEsc(s.title || s.id || 'Section') + '</h3><p><span class="pmfai-score">Pattern: ' + pmfaiEsc(s.pattern || '-') + '</span><span class="pmfai-score">Type: ' + pmfaiEsc(s.type || '-') + '</span></p><p>' + pmfaiEsc(s.goal || '') + '</p>' + renderPreviewBox(s.html || s.shortcode || '', s.css || '') + '</div>'; });
   if (j.shortcode) h += '<h3>Flatsome Shortcode</h3><pre>' + pmfaiEsc(j.shortcode) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.shortcode) + '">Copy Shortcode</button></p>';
   if (j.raw && !j.page) h += '<h3>Raw AI Response</h3><pre>' + pmfaiEsc(j.raw) + '</pre>';
   return h + '</div>';
