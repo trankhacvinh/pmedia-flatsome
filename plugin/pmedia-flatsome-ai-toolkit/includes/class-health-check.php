@@ -20,6 +20,7 @@ final class PMFAI_Health_Check
         $checks[] = self::check('Frontend CSS Toolkit', $options['enable_frontend_css'] === '1' ? 'Enabled' : 'Disabled', $options['enable_frontend_css'] === '1', 'Nên bật để các class pm-* hiển thị đúng ở frontend.');
         $checks[] = self::check('REST API', esc_url_raw(rest_url('pmedia-ai/v1')), true, 'REST namespace của plugin.');
         $checks[] = self::provider_check($provider, $options);
+        $checks[] = self::fallback_check($provider, $options);
         $checks[] = self::check('Provider model', PMFAI_AI_Provider_Manager::model($provider, $options), true, 'Model mặc định theo provider đang chọn.');
         $checks[] = self::check('Usage logs post type', post_type_exists('pmedia_ai_usage') ? 'Registered' : 'Missing', post_type_exists('pmedia_ai_usage'), 'Dùng để ghi log lượt gọi AI.');
         $checks[] = self::check('PHP compat helpers', function_exists('pmfai_str_starts_with') ? 'Loaded' : 'Missing', function_exists('pmfai_str_starts_with'), 'Hỗ trợ PHP 7.4 cho str_starts_with/str_ends_with.');
@@ -41,21 +42,35 @@ final class PMFAI_Health_Check
 
     private static function provider_check(string $provider, array $options): array
     {
-        $key = '';
-        $endpoint = '';
-        if ($provider === 'anthropic') {
-            $key = trim((string)($options['anthropic_api_key'] ?? ''));
-            $endpoint = trim((string)($options['anthropic_endpoint'] ?? ''));
-        } elseif ($provider === 'openai_compatible') {
-            $key = trim((string)($options['compatible_api_key'] ?? ''));
-            $endpoint = trim((string)($options['compatible_endpoint'] ?? ''));
-        } else {
-            $key = trim((string)($options['api_key'] ?? ''));
-            $endpoint = trim((string)($options['api_endpoint'] ?? ''));
-        }
-
+        [$key, $endpoint] = self::provider_credentials($provider, $options);
         $ok = $key !== '' && $endpoint !== '';
         return self::check('AI Provider', PMFAI_AI_Provider_Manager::provider_label($provider) . ' / ' . ($endpoint ?: 'missing endpoint'), $ok, $ok ? 'Provider đã có endpoint và API key.' : 'Provider đang chọn thiếu endpoint hoặc API key.');
+    }
+
+    private static function fallback_check(string $provider, array $options): array
+    {
+        $enabled = ($options['enable_provider_fallback'] ?? '0') === '1';
+        $fallback = sanitize_key($options['fallback_provider'] ?? '');
+        if (!$enabled) {
+            return self::check('Fallback provider', 'Disabled', true, 'Fallback đang tắt.');
+        }
+        if (!$fallback || $fallback === $provider) {
+            return self::check('Fallback provider', $fallback ?: 'missing', false, 'Fallback phải khác provider chính.');
+        }
+        [$key, $endpoint] = self::provider_credentials($fallback, $options);
+        $ok = $key !== '' && $endpoint !== '';
+        return self::check('Fallback provider', PMFAI_AI_Provider_Manager::provider_label($fallback) . ' / ' . ($endpoint ?: 'missing endpoint'), $ok, $ok ? 'Fallback đã có endpoint và API key.' : 'Fallback đang bật nhưng thiếu endpoint hoặc API key.');
+    }
+
+    private static function provider_credentials(string $provider, array $options): array
+    {
+        if ($provider === 'anthropic') {
+            return [trim((string)($options['anthropic_api_key'] ?? '')), trim((string)($options['anthropic_endpoint'] ?? ''))];
+        }
+        if ($provider === 'openai_compatible') {
+            return [trim((string)($options['compatible_api_key'] ?? '')), trim((string)($options['compatible_endpoint'] ?? ''))];
+        }
+        return [trim((string)($options['api_key'] ?? '')), trim((string)($options['api_endpoint'] ?? ''))];
     }
 
     private static function check(string $name, string $value, bool $ok, string $note = '', string $warning_if = ''): array
