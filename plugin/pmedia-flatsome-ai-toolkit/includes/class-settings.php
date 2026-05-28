@@ -7,6 +7,8 @@ final class PMFAI_Settings
     {
         return [
             'ai_provider' => 'openai',
+            'enable_provider_fallback' => '0',
+            'fallback_provider' => 'openai_compatible',
             'api_endpoint' => 'https://api.openai.com/v1/chat/completions',
             'api_key' => '',
             'api_model' => 'gpt-4.1-mini',
@@ -61,14 +63,14 @@ final class PMFAI_Settings
 
         foreach ($defaults as $key => $default) {
             $value = $input[$key] ?? ($current[$key] ?? $default);
-            if ($key === 'ai_provider') {
+            if ($key === 'ai_provider' || $key === 'fallback_provider') {
                 $provider = sanitize_key($value);
-                $output[$key] = in_array($provider, ['openai', 'openai_compatible', 'anthropic'], true) ? $provider : 'openai';
+                $output[$key] = in_array($provider, ['openai', 'openai_compatible', 'anthropic'], true) ? $provider : $default;
             } elseif (strpos($key, 'color') !== false) {
                 $output[$key] = sanitize_hex_color($value) ?: $default;
             } elseif ($key === 'extra_rules') {
                 $output[$key] = sanitize_textarea_field($value);
-            } elseif ($key === 'enable_frontend_css') {
+            } elseif ($key === 'enable_frontend_css' || $key === 'enable_provider_fallback') {
                 $output[$key] = !empty($value) ? '1' : '0';
             } elseif ($key === 'anthropic_max_tokens') {
                 $tokens = absint($value);
