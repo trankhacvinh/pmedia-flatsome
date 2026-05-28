@@ -19,6 +19,7 @@ final class PMFAI_Plugin
         add_action('rest_api_init', ['PMFAI_REST_API', 'register']);
         add_action('rest_api_init', ['PMFAI_Page_Section_Regenerator', 'register_routes']);
         add_action('rest_api_init', ['PMFAI_AI_Provider_Tester', 'register_routes']);
+        add_action('rest_api_init', ['PMFAI_Usage_Logs_V2', 'register_routes']);
     }
 
     public static function activate(): void
