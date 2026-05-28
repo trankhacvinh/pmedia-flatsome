@@ -6,9 +6,16 @@ final class PMFAI_Settings
     public static function default_options(): array
     {
         return [
+            'ai_provider' => 'openai',
             'api_endpoint' => 'https://api.openai.com/v1/chat/completions',
             'api_key' => '',
             'api_model' => 'gpt-4.1-mini',
+            'compatible_endpoint' => '',
+            'compatible_api_key' => '',
+            'compatible_model' => '',
+            'anthropic_endpoint' => 'https://api.anthropic.com/v1/messages',
+            'anthropic_api_key' => '',
+            'anthropic_model' => 'claude-3-5-sonnet-latest',
             'temperature' => '0.4',
             'fast_model' => '',
             'fast_temperature' => '0.2',
@@ -53,7 +60,10 @@ final class PMFAI_Settings
 
         foreach ($defaults as $key => $default) {
             $value = $input[$key] ?? ($current[$key] ?? $default);
-            if (strpos($key, 'color') !== false) {
+            if ($key === 'ai_provider') {
+                $provider = sanitize_key($value);
+                $output[$key] = in_array($provider, ['openai', 'openai_compatible', 'anthropic'], true) ? $provider : 'openai';
+            } elseif (strpos($key, 'color') !== false) {
                 $output[$key] = sanitize_hex_color($value) ?: $default;
             } elseif ($key === 'extra_rules') {
                 $output[$key] = sanitize_textarea_field($value);
