@@ -21,6 +21,8 @@ final class PMFAI_Usage_Logger
         $status = sanitize_key($data['status'] ?? 'unknown');
         $action = sanitize_key($data['action'] ?? 'generate-block');
         $title = strtoupper($status) . ' - ' . $action . ' - ' . current_time('Y-m-d H:i:s');
+        $options = PMFAI_Settings::get_options();
+        $provider = sanitize_key($data['provider'] ?? PMFAI_AI_Provider_Manager::provider_id($options));
 
         $post_id = wp_insert_post([
             'post_type' => 'pmedia_ai_usage',
@@ -38,6 +40,7 @@ final class PMFAI_Usage_Logger
         $fields = [
             '_pmfai_action' => $action,
             '_pmfai_status' => $status,
+            '_pmfai_provider' => $provider,
             '_pmfai_mode' => sanitize_key($data['mode'] ?? ''),
             '_pmfai_model' => sanitize_text_field($data['model'] ?? ''),
             '_pmfai_type' => sanitize_key($data['type'] ?? ''),
@@ -66,6 +69,7 @@ final class PMFAI_Usage_Logger
             'paged' => 1,
             'status' => '',
             'mode' => '',
+            'provider' => '',
         ]);
 
         $query_args = [
@@ -83,6 +87,9 @@ final class PMFAI_Usage_Logger
         }
         if (!empty($args['mode'])) {
             $meta_query[] = ['key' => '_pmfai_mode', 'value' => sanitize_key($args['mode'])];
+        }
+        if (!empty($args['provider'])) {
+            $meta_query[] = ['key' => '_pmfai_provider', 'value' => sanitize_key($args['provider'])];
         }
         if ($meta_query) {
             $query_args['meta_query'] = $meta_query;
@@ -119,6 +126,7 @@ final class PMFAI_Usage_Logger
             'total_tokens' => 0,
             'prompt_tokens' => 0,
             'completion_tokens' => 0,
+            'providers' => [],
         ];
 
         foreach ($q->posts as $post) {
@@ -128,6 +136,10 @@ final class PMFAI_Usage_Logger
             $summary['total_tokens'] += absint(get_post_meta($post->ID, '_pmfai_total_tokens', true));
             $summary['prompt_tokens'] += absint(get_post_meta($post->ID, '_pmfai_prompt_tokens', true));
             $summary['completion_tokens'] += absint(get_post_meta($post->ID, '_pmfai_completion_tokens', true));
+            $provider = (string)get_post_meta($post->ID, '_pmfai_provider', true);
+            if ($provider !== '') {
+                $summary['providers'][$provider] = ($summary['providers'][$provider] ?? 0) + 1;
+            }
         }
 
         return $summary;
@@ -140,6 +152,7 @@ final class PMFAI_Usage_Logger
             'created_at' => get_date_from_gmt($post->post_date_gmt, 'Y-m-d H:i:s'),
             'action' => (string)get_post_meta($post->ID, '_pmfai_action', true),
             'status' => (string)get_post_meta($post->ID, '_pmfai_status', true),
+            'provider' => (string)get_post_meta($post->ID, '_pmfai_provider', true),
             'mode' => (string)get_post_meta($post->ID, '_pmfai_mode', true),
             'model' => (string)get_post_meta($post->ID, '_pmfai_model', true),
             'type' => (string)get_post_meta($post->ID, '_pmfai_type', true),
