@@ -11,6 +11,10 @@ final class PMFAI_Anthropic_Provider implements PMFAI_AI_Provider_Interface
             return new WP_Error('missing_api_key', 'Chưa cấu hình Anthropic API key.', ['status' => 400]);
         }
 
+        $options = is_array($request['options'] ?? null) ? $request['options'] : PMFAI_Settings::get_options();
+        $max_tokens = absint($request['max_tokens'] ?? ($options['anthropic_max_tokens'] ?? 4096));
+        $max_tokens = max(512, min(20000, $max_tokens ?: 4096));
+
         $system = '';
         $messages = [];
         foreach ((array)($request['messages'] ?? []) as $message) {
@@ -28,7 +32,7 @@ final class PMFAI_Anthropic_Provider implements PMFAI_AI_Provider_Interface
 
         $payload = [
             'model' => $request['model'],
-            'max_tokens' => (int)($request['max_tokens'] ?? 4096),
+            'max_tokens' => $max_tokens,
             'temperature' => $request['temperature'],
             'messages' => $messages,
         ];
