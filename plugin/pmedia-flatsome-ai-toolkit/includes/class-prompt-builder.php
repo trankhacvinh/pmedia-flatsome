@@ -23,6 +23,7 @@ final class PMFAI_Prompt_Builder
             'style' => 'hiện đại, chuyên nghiệp, dễ bán hàng',
             'goal' => 'Tạo giao diện section có thể copy vào Flatsome HTML Block.',
             'content' => '',
+            'output_mode' => 'html-block',
         ]);
 
         $tasks = [
@@ -34,7 +35,7 @@ final class PMFAI_Prompt_Builder
             'ux-builder-guide' => 'Tạo hướng dẫn dựng bằng UX Builder và HTML Block mẫu tối thiểu.',
         ];
 
-        return "Bạn là chuyên gia chuyển đổi UI sang HTML Block tương thích WordPress Flatsome.\n\n"
+        $prompt = "Bạn là chuyên gia chuyển đổi UI sang HTML Block tương thích WordPress Flatsome.\n\n"
             . "Bối cảnh: {$args['site']}\nNgành nghề: {$args['industry']}\nPhong cách: {$args['style']}\nMục tiêu: {$args['goal']}\n\n"
             . "Class ưu tiên: pm-section, pm-section-soft, pm-section-title, pm-eyebrow, pm-lead, pm-card, pm-feature-list, pm-cta-box, pm-pricing-card, pm-faq, pm-step, pm-hero-split, pm-service-grid, pmedia-ai-block, row, col, col-inner, button primary is-large.\n\n"
             . "Design System token có sẵn, PHẢI dùng lại, không tự khai báo token mới trong từng block:\n"
@@ -55,5 +56,7 @@ final class PMFAI_Prompt_Builder
             . "Nhiệm vụ: " . ($tasks[$type] ?? $tasks['generate-from-description']) . "\n\n"
             . "Nội dung/mô tả/code cần xử lý:\n" . ($args['content'] ?: '[Dán nội dung hoặc đính kèm ảnh ở ChatGPT]') . "\n\n"
             . "Ví dụ output:\n```pmedia-flatsome-block\n{\"title\":\"Tên block\",\"type\":\"hero\",\"style\":\"business\",\"description\":\"Mô tả ngắn\",\"html\":\"<section class=\\\"pm-section pmedia-ai-block\\\">...</section>\",\"css\":\"\",\"js\":\"\",\"notes\":[\"Ghi chú nếu có\"]}\n```";
+
+        return PMFAI_Flatsome_UI_Skill::enhance_prompt($prompt, sanitize_key((string)$args['output_mode']), 'bridge-block');
     }
 }
