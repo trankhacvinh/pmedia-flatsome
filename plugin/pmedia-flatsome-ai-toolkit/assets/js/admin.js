@@ -103,7 +103,8 @@ document.addEventListener('click', async function (e) {
       if (r.created) {
         pmfaiLastCreatedDraftId = r.post_id;
         t.classList.add('is-disabled');
-        const notice = '<div class="pmfai-status-box is-success"><strong>Đã tạo Page Draft #' + r.post_id + ' thành công.</strong><div class="pmfai-created-page-actions"><a class="button button-primary" href="' + pmfaiAttr(r.edit_url || '#') + '" target="_blank">Mở trang chỉnh sửa</a><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(r.shortcode || '') + '">Copy Shortcode</button></div></div>';
+        let notice = '<div class="pmfai-status-box is-success"><strong>Đã tạo Page Draft #' + r.post_id + ' thành công.</strong><div class="pmfai-created-page-actions"><a class="button button-primary" href="' + pmfaiAttr(r.edit_url || '#') + '" target="_blank">Mở trang chỉnh sửa</a><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(r.shortcode || '') + '">Copy Shortcode</button></div></div>';
+        notice += renderQualityBox(r.ui_skill_quality || r.ui_skill_shortcode_quality || r.quality, 'UI Skill Quality');
         html('pmfai-page-notice', notice);
       } else html('pmfai-page-notice', renderError(r));
     });
@@ -139,6 +140,7 @@ document.addEventListener('click', async function (e) {
     if (!pmfaiLastParsedBlock) return;
     const saved = await pmfaiFetch('/blocks', 'POST', Object.assign({}, pmfaiLastParsedBlock, {source: pmfaiLastParsedBlock.source || 'chatgpt-bridge'}));
     if (saved.id) alert('Đã lưu block #' + saved.id + ' vào Library.');
+    else if (saved.code) alert(saved.message || 'Lưu block thất bại.');
   }
 
   if (t.id === 'pmfai-validate-code') {
@@ -222,7 +224,12 @@ async function loadPmfaiLibrary() {
   const data = await pmfaiFetch('/blocks?per_page=50&s=' + encodeURIComponent(val('pmfai-library-search')) + '&type=' + encodeURIComponent(val('pmfai-library-type')) + '&industry=' + encodeURIComponent(val('pmfai-library-industry')), 'GET');
   if (!data.items || !data.items.length) { result.innerHTML = '<p>Chưa có block nào trong Library.</p><div id="pmfai-library-detail"></div>'; return; }
   let h = '<table class="widefat striped pmfai-library-table"><thead><tr><th>Tên</th><th>Loại</th><th>Ngành</th><th>Style</th><th>Điểm</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>';
-  data.items.forEach(item => { const css = item.scores && item.scores.css_safety ? item.scores.css_safety : '-'; const flat = item.scores && item.scores.flatsome_compatibility ? item.scores.flatsome_compatibility : '-'; h += '<tr><td><strong>' + pmfaiEsc(item.title) + '</strong><br><small>' + pmfaiEsc(item.description || '') + '</small></td><td>' + pmfaiEsc(item.type || '') + '</td><td>' + pmfaiEsc(item.industry || '') + '</td><td>' + pmfaiEsc(item.style || '') + '</td><td>CSS ' + css + ' / Flatsome ' + flat + '</td><td>' + pmfaiEsc(item.created_at || '') + '</td><td><button class="button pmfai-view-block" data-id="' + item.id + '">Xem</button> <button class="button pmfai-duplicate-block" data-id="' + item.id + '">Duplicate</button> <button class="button pmfai-export-block" data-id="' + item.id + '">Export</button> <button class="button pmfai-delete-block" data-id="' + item.id + '">Xóa</button></td></tr>'; });
+  data.items.forEach(item => {
+    const css = item.scores && item.scores.css_safety ? item.scores.css_safety : '-';
+    const flat = item.scores && item.scores.flatsome_compatibility ? item.scores.flatsome_compatibility : '-';
+    const skill = item.scores && item.scores.ui_skill && item.scores.ui_skill.score ? item.scores.ui_skill.score : '-';
+    h += '<tr><td><strong>' + pmfaiEsc(item.title) + '</strong><br><small>' + pmfaiEsc(item.description || '') + '</small></td><td>' + pmfaiEsc(item.type || '') + '</td><td>' + pmfaiEsc(item.industry || '') + '</td><td>' + pmfaiEsc(item.style || '') + '</td><td>CSS ' + css + ' / Flatsome ' + flat + ' / Skill ' + skill + '</td><td>' + pmfaiEsc(item.created_at || '') + '</td><td><button class="button pmfai-view-block" data-id="' + item.id + '">Xem</button> <button class="button pmfai-duplicate-block" data-id="' + item.id + '">Duplicate</button> <button class="button pmfai-export-block" data-id="' + item.id + '">Export</button> <button class="button pmfai-delete-block" data-id="' + item.id + '">Xóa</button></td></tr>';
+  });
   result.innerHTML = h + '</tbody></table><div id="pmfai-library-detail" class="pmfai-panel pmfai-library-detail"></div>';
 }
 
@@ -251,11 +258,12 @@ function renderPageResult(j) {
   if (j.code && j.message) return renderError(j);
   const page = j.page || {};
   let h = '<div id="pmfai-page-notice"></div><div class="pmfai-result"><h2>' + pmfaiEsc(page.title || 'Generated Page') + '</h2><p>' + pmfaiEsc(page.description || '') + '</p>';
+  h += renderQualityBox(j.ui_skill_quality, 'UI Skill Page Quality');
   if (j.cost_mode || j.model || j.output_mode || page.output_mode) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Output: ' + pmfaiEsc(j.output_mode || page.output_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
   if (j.visual_quality) h += '<div class="pmfai-quality-box"><strong>Visual Quality Score: ' + (j.visual_quality.score || 0) + '/100</strong></div>';
   if (j.warnings && j.warnings.length) h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
   if (j.suggestions && j.suggestions.length) h += '<h3>Gợi ý cải thiện layout</h3><ul>' + j.suggestions.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
-  (page.sections || []).forEach(s => { h += '<div class="pmfai-page-section-preview"><h3>' + pmfaiEsc(s.title || s.id || 'Section') + '</h3><p><span class="pmfai-score">Pattern: ' + pmfaiEsc(s.pattern || '-') + '</span><span class="pmfai-score">Type: ' + pmfaiEsc(s.type || '-') + '</span></p><p>' + pmfaiEsc(s.goal || '') + '</p>' + renderPreviewBox(s.html || s.shortcode || '', s.css || '') + '</div>'; });
+  (page.sections || []).forEach(s => { h += '<div class="pmfai-page-section-preview"><h3>' + pmfaiEsc(s.title || s.id || 'Section') + '</h3><p><span class="pmfai-score">Pattern: ' + pmfaiEsc(s.pattern || '-') + '</span><span class="pmfai-score">Type: ' + pmfaiEsc(s.type || '-') + '</span></p>' + renderQualityBox(s.ui_skill_quality, 'Section Quality') + '<p>' + pmfaiEsc(s.goal || '') + '</p>' + renderPreviewBox(s.html || s.shortcode || '', s.css || '') + '</div>'; });
   if (j.shortcode) h += '<h3>Flatsome Shortcode</h3><pre>' + pmfaiEsc(j.shortcode) + '</pre><p><button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(j.shortcode) + '">Copy Shortcode</button></p>';
   if (j.raw && !j.page) h += '<h3>Raw AI Response</h3><pre>' + pmfaiEsc(j.raw) + '</pre>';
   return h + '</div>';
@@ -263,23 +271,52 @@ function renderPageResult(j) {
 
 function renderLibraryDetail(block) {
   if (block.code && block.message) return renderError(block);
-  let h = '<div class="pmfai-library-editor"><h2>Chỉnh sửa block #' + block.id + '</h2><div class="pmfai-grid-2">' + editField('pmfai-edit-title', 'Tên block', block.title || '') + editField('pmfai-edit-type', 'Loại block', block.type || '') + editField('pmfai-edit-style', 'Style', block.style || '') + editField('pmfai-edit-industry', 'Ngành nghề', block.industry || '') + editField('pmfai-edit-tags', 'Tags', block.tags || '') + '</div>';
+  let h = '<div class="pmfai-library-editor"><h2>Chỉnh sửa block #' + block.id + '</h2>' + renderQualityBox(block.scores && block.scores.ui_skill, 'UI Skill Quality') + '<div class="pmfai-grid-2">' + editField('pmfai-edit-title', 'Tên block', block.title || '') + editField('pmfai-edit-type', 'Loại block', block.type || '') + editField('pmfai-edit-style', 'Style', block.style || '') + editField('pmfai-edit-industry', 'Ngành nghề', block.industry || '') + editField('pmfai-edit-tags', 'Tags', block.tags || '') + '</div>';
   h += '<label class="pmfai-field"><span>Mô tả</span><textarea id="pmfai-edit-description" rows="3">' + pmfaiEsc(block.description || '') + '</textarea></label>' + renderPreviewBox(block.html || '', block.css || '') + '<label class="pmfai-field"><span>HTML</span><textarea id="pmfai-edit-html" rows="10">' + pmfaiEsc(block.html || '') + '</textarea></label><label class="pmfai-field"><span>CSS</span><textarea id="pmfai-edit-css" rows="8">' + pmfaiEsc(block.css || '') + '</textarea></label><label class="pmfai-field"><span>JS</span><textarea id="pmfai-edit-js" rows="5">' + pmfaiEsc(block.js || '') + '</textarea></label><p><button class="button button-primary pmfai-save-block-meta" data-id="' + block.id + '">Lưu thay đổi</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.html || '') + '">Copy HTML</button> <button class="button pmfai-copy-text" data-copy="' + pmfaiAttr(block.css || '') + '">Copy CSS</button></p></div>';
   return h;
 }
 
 function editField(id, label, value) { return '<label class="pmfai-field"><span>' + pmfaiEsc(label) + '</span><input id="' + id + '" value="' + pmfaiAttr(value) + '"></label>'; }
-function renderError(j) { return '<div class="pmfai-status-box is-error">' + pmfaiEsc(j.message || j.code || 'Có lỗi xảy ra.') + '</div>'; }
+function renderError(j) {
+  if (j && j.code === 'ui_quality_gate_failed') return renderQualityGateError(j);
+  return '<div class="pmfai-status-box is-error">' + pmfaiEsc((j && (j.message || j.code)) || 'Có lỗi xảy ra.') + '</div>';
+}
 function pmfaiEsc(s) { return String(s || '').replace(/[&<>]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[m])); }
 function pmfaiAttr(s) { return pmfaiEsc(s).replace(/"/g, '&quot;'); }
+
+function renderQualityGateError(j) {
+  const q = j && j.data && j.data.quality ? j.data.quality : null;
+  let h = '<div class="pmfai-status-box is-error"><strong>Quality Gate đã chặn thao tác.</strong><br>' + pmfaiEsc((j && j.message) || 'Output chưa đủ an toàn để lưu vào website.') + '</div>';
+  if (q) {
+    h += renderQualityBox(q, 'UI Skill Quality');
+    if (q.section_scores) {
+      h += '<details open><summary>Điểm từng section</summary><ul>';
+      Object.keys(q.section_scores).forEach(key => { const s = q.section_scores[key] || {}; h += '<li><strong>' + pmfaiEsc(key) + '</strong>: ' + pmfaiEsc(s.score || 0) + '/100 — ' + pmfaiEsc(s.gate || '-') + '</li>'; });
+      h += '</ul></details>';
+    }
+  }
+  h += '<div class="pmfai-status-box"><strong>Hướng xử lý:</strong><br>1. Chọn High Quality rồi Generate lại.<br>2. Ưu tiên Section + HTML Block nếu Native Shortcode lỗi.<br>3. Regenerate riêng section có điểm thấp.<br>4. Bổ sung brief rõ hơn về nội dung, CTA, số card và phong cách.</div>';
+  return h;
+}
+
+function renderQualityBox(quality, label) {
+  if (!quality) return '';
+  const score = typeof quality.score !== 'undefined' ? quality.score : '-';
+  const gate = quality.gate || '-';
+  const cls = gate === 'pass' ? 'is-success' : (gate === 'fail' ? 'is-error' : '');
+  let h = '<div class="pmfai-status-box ' + cls + '"><strong>' + pmfaiEsc(label || 'UI Skill Quality') + ': ' + pmfaiEsc(score) + '/100</strong><br>Gate: ' + pmfaiEsc(gate) + '</div>';
+  if (quality.warnings && quality.warnings.length) h += '<details><summary>Quality warnings</summary><ul>' + quality.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul></details>';
+  return h;
+}
 
 function renderPmfaiResult(j, canSave, withPreview) {
   if (j.code && j.message) return renderError(j);
   let h = '<div class="pmfai-result">';
+  h += renderQualityBox(j.quality || j.ui_skill_quality || j.ui_skill_shortcode_quality, 'UI Skill Quality');
   if (j.title) h += '<h2>' + pmfaiEsc(j.title) + '</h2>';
   if (j.cost_mode || j.model) h += '<p><span class="pmfai-score">Mode: ' + pmfaiEsc(j.cost_mode || '-') + '</span><span class="pmfai-score">Model: ' + pmfaiEsc(j.model || '-') + '</span></p>';
   if (j.usage && j.usage.total_tokens) h += '<p><span class="pmfai-score">Tokens: ' + j.usage.total_tokens + '</span></p>';
-  if (j.scores) h += '<p><span class="pmfai-score">CSS Safety: ' + j.scores.css_safety + '/100</span><span class="pmfai-score">Flatsome: ' + j.scores.flatsome_compatibility + '/100</span></p>';
+  if (j.scores) h += '<p><span class="pmfai-score">CSS Safety: ' + (j.scores.css_safety || '-') + '/100</span><span class="pmfai-score">Flatsome: ' + (j.scores.flatsome_compatibility || '-') + '/100</span></p>';
   if (j.parse_error) h += '<div class="notice notice-warning"><p>AI trả về chưa parse được: ' + pmfaiEsc(j.parse_error) + '</p></div>';
   if (j.changes && j.changes.length) h += '<h3>Đã tự sửa</h3><ul>' + j.changes.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
   if (j.warnings && j.warnings.length) h += '<h3>Cảnh báo</h3><ul>' + j.warnings.map(x => '<li>' + pmfaiEsc(x) + '</li>').join('') + '</ul>';
