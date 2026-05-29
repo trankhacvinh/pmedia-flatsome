@@ -20,6 +20,7 @@ final class PMFAI_AI_Service
             'style' => sanitize_text_field($params['style'] ?? 'hiện đại, chuyên nghiệp'),
             'goal' => sanitize_text_field($params['goal'] ?? 'Tạo HTML Block copy vào Flatsome'),
             'content' => $content,
+            'output_mode' => 'html-block',
         ]);
 
         $response = PMFAI_AI_Provider_Manager::complete([
@@ -29,7 +30,7 @@ final class PMFAI_AI_Service
             'temperature' => $mode_config['temperature'],
             'timeout' => $mode_config['timeout'],
             'messages' => [
-                ['role' => 'system', 'content' => $mode_config['system']],
+                ['role' => 'system', 'content' => $mode_config['system'] . ' Use PMEDIA FLATSOME UI SKILL strictly.'],
                 ['role' => 'user', 'content' => $prompt],
             ],
         ]);
@@ -40,6 +41,7 @@ final class PMFAI_AI_Service
             PMFAI_Usage_Logger::log([
                 'action' => 'generate-block',
                 'status' => 'error',
+                'provider' => $provider,
                 'mode' => $cost_mode,
                 'model' => $mode_config['model'],
                 'type' => $type,
@@ -50,6 +52,7 @@ final class PMFAI_AI_Service
             return $response;
         }
 
+        $actual_provider = sanitize_key($response['provider'] ?? $provider);
         $content = (string)($response['content'] ?? '');
         $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
         $code = (int)($response['http_code'] ?? 200);
@@ -58,6 +61,7 @@ final class PMFAI_AI_Service
             PMFAI_Usage_Logger::log([
                 'action' => 'generate-block',
                 'status' => 'error',
+                'provider' => $actual_provider,
                 'mode' => $cost_mode,
                 'model' => $mode_config['model'],
                 'type' => $type,
@@ -75,6 +79,7 @@ final class PMFAI_AI_Service
             PMFAI_Usage_Logger::log([
                 'action' => 'generate-block',
                 'status' => 'error',
+                'provider' => $actual_provider,
                 'mode' => $cost_mode,
                 'model' => $mode_config['model'],
                 'type' => $type,
@@ -90,14 +95,17 @@ final class PMFAI_AI_Service
                 'prompt' => $prompt,
                 'cost_mode' => $cost_mode,
                 'model' => $mode_config['model'],
-                'provider' => $provider,
+                'provider' => $actual_provider,
                 'usage' => $usage,
             ];
         }
 
+        $parsed = PMFAI_Flatsome_UI_Skill::repair_block($parsed);
+
         PMFAI_Usage_Logger::log([
             'action' => 'generate-block',
             'status' => 'success',
+            'provider' => $actual_provider,
             'mode' => $cost_mode,
             'model' => $mode_config['model'],
             'type' => $type,
@@ -105,6 +113,7 @@ final class PMFAI_AI_Service
             'duration_ms' => $duration_ms,
             'http_code' => $code,
             'usage' => $usage,
+            'error_message' => !empty($response['fallback_used']) ? ('Fallback used from ' . ($response['primary_provider'] ?? $provider) . ' to ' . $actual_provider) : '',
         ]);
 
         $parsed['raw'] = $content;
@@ -112,7 +121,8 @@ final class PMFAI_AI_Service
         $parsed['source'] = 'auto-mode-' . $cost_mode;
         $parsed['cost_mode'] = $cost_mode;
         $parsed['model'] = $mode_config['model'];
-        $parsed['provider'] = $provider;
+        $parsed['provider'] = $actual_provider;
+        $parsed['fallback_used'] = !empty($response['fallback_used']);
         $parsed['usage'] = $usage;
         return $parsed;
     }
