@@ -5,6 +5,7 @@ final class PMFAI_Block_Library
 {
     public static function save(array $data)
     {
+        $data = self::skill_prepare($data);
         $title = sanitize_text_field($data['title'] ?? 'Untitled Block');
         $post_id = wp_insert_post([
             'post_type' => 'pmedia_ai_block',
@@ -26,6 +27,8 @@ final class PMFAI_Block_Library
         if (!$post || $post->post_type !== 'pmedia_ai_block') {
             return new WP_Error('not_found', 'Không tìm thấy block.', ['status' => 404]);
         }
+
+        $data = self::skill_prepare($data);
 
         if (isset($data['title'])) {
             wp_update_post([
@@ -148,6 +151,18 @@ final class PMFAI_Block_Library
         }
         wp_delete_post($post_id, true);
         return ['deleted' => true, 'id' => $post_id];
+    }
+
+    private static function skill_prepare(array $data): array
+    {
+        if (!empty($data['html']) || !empty($data['css'])) {
+            $data = PMFAI_Flatsome_UI_Skill::repair_block($data);
+            $data['scores'] = array_merge((array)($data['scores'] ?? []), ['ui_skill' => $data['quality'] ?? []]);
+            $notes = is_array($data['notes'] ?? null) ? $data['notes'] : [];
+            foreach ((array)($data['warnings'] ?? []) as $warning) { $notes[] = $warning; }
+            $data['notes'] = array_values(array_unique($notes));
+        }
+        return $data;
     }
 
     private static function update_meta(int $post_id, array $data): void
