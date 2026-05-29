@@ -82,6 +82,9 @@ final class PMFAI_Page_Insert_Box
             return new WP_Error('empty_shortcode', 'Shortcode rỗng, không thể cập nhật page.', ['status' => 400]);
         }
 
+        $detected_mode = stripos($shortcode, 'pm-native-section') !== false || stripos($shortcode, 'pm-pattern-') !== false ? 'flatsome-native' : 'html-block';
+        $shortcode = PMFAI_Flatsome_UI_Skill::repair_shortcode($shortcode, $detected_mode);
+
         switch ($action) {
             case 'replace':
                 $new_content = $shortcode;
@@ -111,6 +114,7 @@ final class PMFAI_Page_Insert_Box
             'view_url' => get_permalink($post_id),
             'action' => $action,
             'shortcode' => $shortcode,
+            'quality' => PMFAI_Flatsome_UI_Skill::score_block($shortcode, ''),
             'content_length' => strlen($new_content),
         ];
     }
