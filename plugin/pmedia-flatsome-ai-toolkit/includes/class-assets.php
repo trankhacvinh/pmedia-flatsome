@@ -22,6 +22,7 @@ final class PMFAI_Assets
         ]);
 
         if ($is_pmfai_screen) {
+            wp_enqueue_script('pmfai-quality-gate-ui', PMFAI_URL . 'assets/js/quality-gate-ui.js', ['pmfai-admin'], PMFAI_VERSION, true);
             wp_enqueue_script('pmfai-page-builder-output-mode', PMFAI_URL . 'assets/js/page-builder-output-mode.js', ['pmfai-admin'], PMFAI_VERSION, true);
             wp_enqueue_script('pmfai-page-builder-regenerate', PMFAI_URL . 'assets/js/page-builder-regenerate.js', ['pmfai-admin'], PMFAI_VERSION, true);
             wp_enqueue_script('pmfai-provider-tools', PMFAI_URL . 'assets/js/provider-tools.js', ['pmfai-admin'], PMFAI_VERSION, true);
