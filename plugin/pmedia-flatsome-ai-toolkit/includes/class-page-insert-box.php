@@ -84,6 +84,10 @@ final class PMFAI_Page_Insert_Box
 
         $detected_mode = stripos($shortcode, 'pm-native-section') !== false || stripos($shortcode, 'pm-pattern-') !== false ? 'flatsome-native' : 'html-block';
         $shortcode = PMFAI_Flatsome_UI_Skill::repair_shortcode($shortcode, $detected_mode);
+        $gate = PMFAI_UI_Quality_Gate::check_shortcode($shortcode, 'page insert');
+        if (is_wp_error($gate)) {
+            return $gate;
+        }
 
         switch ($action) {
             case 'replace':
@@ -114,7 +118,8 @@ final class PMFAI_Page_Insert_Box
             'view_url' => get_permalink($post_id),
             'action' => $action,
             'shortcode' => $shortcode,
-            'quality' => PMFAI_Flatsome_UI_Skill::score_block($shortcode, ''),
+            'quality' => $gate['quality'] ?? PMFAI_Flatsome_UI_Skill::score_block($shortcode, ''),
+            'quality_warning' => $gate['warning'] ?? '',
             'content_length' => strlen($new_content),
         ];
     }
