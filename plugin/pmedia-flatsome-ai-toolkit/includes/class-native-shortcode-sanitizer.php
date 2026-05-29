@@ -23,12 +23,11 @@ final class PMFAI_Native_Shortcode_Sanitizer
 
     private static function looks_like_pmfai_native_content(string $content): bool
     {
-        return stripos($content, 'pm-pattern-') !== false
-            || stripos($content, 'pm-native-section') !== false
-            || stripos($content, '[pm-') !== false
-            || stripos($content, 'pm-service-card') !== false
-            || stripos($content, 'pm-process-timeline') !== false
-            || stripos($content, 'pm-hero-visual') !== false;
+        // Important: do NOT trigger on generic pm-pattern-* or HTML component classes.
+        // HTML Block mode also uses pm-pattern-* and pm-* classes; sanitizing it here would flatten safe HTML blocks.
+        return stripos($content, 'pm-native-section') !== false
+            || stripos($content, 'pm-native-safe') !== false
+            || preg_match('/\[(\/)?pm-[a-z0-9-]+/i', $content) === 1;
     }
 
     public static function sanitize_content(string $content): string
