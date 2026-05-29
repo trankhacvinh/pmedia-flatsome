@@ -28,15 +28,40 @@
     return box ? parseInt(box.dataset.postId || '0', 10) : 0;
   }
 
+  function renderQualityGateError(result) {
+    const q = result && result.data && result.data.quality ? result.data.quality : null;
+    let h = '<div class="pmfai-status-box is-error"><strong>Quality Gate đã chặn thao tác.</strong><br>' + esc(result.message || 'Output chưa đủ an toàn để ghi vào page.') + '</div>';
+    if (q) {
+      h += '<div class="pmfai-status-box is-error"><strong>Điểm UI Skill: ' + esc(q.score || 0) + '/100</strong><br>Gate: ' + esc(q.gate || 'fail') + '</div>';
+      if (q.warnings && q.warnings.length) {
+        h += '<details open><summary>Lý do bị chặn</summary><ul>' + q.warnings.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
+      }
+    }
+    h += '<div class="pmfai-status-box"><strong>Hướng xử lý:</strong><br>1. Thử Generate lại với High Quality.<br>2. Chuyển sang mode Section + HTML Block nếu đang dùng Native Shortcode.<br>3. Viết brief rõ hơn: loại section, số card, CTA, phong cách, nội dung chính.</div>';
+    return h;
+  }
+
+  function renderQualityBadge(quality, warning) {
+    if (!quality) return '';
+    let cls = quality.gate === 'pass' ? 'is-success' : (quality.gate === 'warning' ? '' : 'is-error');
+    let h = '<div class="pmfai-status-box ' + cls + '"><strong>UI Skill Quality: ' + esc(quality.score || 0) + '/100</strong> — Gate: ' + esc(quality.gate || '-') + '</div>';
+    if (warning) h += '<div class="pmfai-status-box">' + esc(warning) + '</div>';
+    if (quality.warnings && quality.warnings.length) h += '<details><summary>Quality warnings</summary><ul>' + quality.warnings.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
+    return h;
+  }
+
   function renderResult(result) {
     if (result.code && result.message) {
+      if (result.code === 'ui_quality_gate_failed') return renderQualityGateError(result);
       return '<div class="pmfai-status-box is-error">' + esc(result.message) + '</div>';
     }
     let h = '';
     if (result.applied && result.applied.updated) {
       h += '<div class="pmfai-status-box is-success"><strong>Đã cập nhật page thành công.</strong><div class="pmfai-created-page-actions"><a class="button button-primary" target="_blank" href="' + attr(result.applied.edit_url || '#') + '">Mở trang sửa</a><a class="button" target="_blank" href="' + attr(result.applied.view_url || '#') + '">Xem trang</a></div></div>';
+      h += renderQualityBadge(result.applied.quality, result.applied.quality_warning);
     } else if (result.shortcode) {
       h += '<div class="pmfai-status-box is-success"><strong>Đã generate shortcode.</strong><br>Chưa apply vào page. Dùng nút copy bên dưới nếu cần.</div>';
+      h += renderQualityBadge(result.ui_skill_shortcode_quality || result.ui_skill_quality, result.quality_warning || '');
     }
     if (result.warnings && result.warnings.length) {
       h += '<details open><summary>Cảnh báo</summary><ul>' + result.warnings.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
