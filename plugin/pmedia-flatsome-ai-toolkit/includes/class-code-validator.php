@@ -15,7 +15,7 @@ final class PMFAI_Code_Validator
         $data = json_decode($json, true);
 
         // Backward-compatible fallback for form-encoded/manual pasted content.
-        // Important: do not wp_unslash before the first json_decode because it corrupts valid JSON strings containing escaped HTML quotes like class=\"...\".
+        // Important: do not wp_unslash before the first json_decode because it corrupts valid JSON strings containing escaped HTML quotes like class="...".
         if (!is_array($data)) {
             $unslashed_json = self::extract_json(wp_unslash($raw));
             if ($unslashed_json && $unslashed_json !== $json) {
@@ -31,7 +31,7 @@ final class PMFAI_Code_Validator
         $css = (string)($data['css'] ?? '');
         $analysis = self::analyze($html, $css);
 
-        return [
+        $block = [
             'title' => sanitize_text_field($data['title'] ?? 'Imported ChatGPT Block'),
             'type' => sanitize_key($data['type'] ?? 'custom'),
             'style' => sanitize_text_field($data['style'] ?? 'business'),
@@ -44,6 +44,15 @@ final class PMFAI_Code_Validator
             'suggestions' => $analysis['suggestions'],
             'scores' => $analysis['scores'],
         ];
+
+        $block = PMFAI_Flatsome_UI_Skill::repair_block($block);
+        $analysis = self::analyze((string)$block['html'], (string)$block['css']);
+        $block['warnings'] = array_values(array_unique(array_merge((array)($block['warnings'] ?? []), $analysis['warnings'])));
+        $block['suggestions'] = array_values(array_unique(array_merge((array)($block['suggestions'] ?? []), $analysis['suggestions'])));
+        $block['scores'] = $analysis['scores'];
+        $block['quality'] = PMFAI_Flatsome_UI_Skill::score_block((string)$block['html'], (string)$block['css']);
+
+        return $block;
     }
 
     private static function extract_json(string $raw): string
@@ -102,6 +111,11 @@ final class PMFAI_Code_Validator
             $warnings[] = 'Chưa thấy class chuẩn pm-*.';
             $flatsomePenalty += 10;
             $suggestions[] = 'Dùng pm-section, pm-card, pm-lead, pm-eyebrow hoặc pm-cta-box.';
+        }
+
+        if (preg_match('/\[(\/)?pm-[a-z0-9-]+/i', $html)) {
+            $warnings[] = 'Có shortcode tự chế pm-*. Skill sẽ cố chuyển thành HTML.';
+            $flatsomePenalty += 20;
         }
 
         if (preg_match_all('/#[0-9a-f]{3,8}\b/i', $css, $hex) && count($hex[0]) > 0) {
