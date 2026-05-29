@@ -11,6 +11,7 @@ final class PMFAI_Plugin
 
         add_action('init', ['PMFAI_Post_Types', 'register']);
         add_action('init', ['PMFAI_Usage_Logger', 'register']);
+        add_action('init', ['PMFAI_Native_Shortcode_Sanitizer', 'register']);
         add_action('admin_menu', ['PMFAI_Admin_Pages', 'register_menu']);
         add_action('admin_menu', [__CLASS__, 'register_health_check_menu'], 30);
         add_action('admin_init', ['PMFAI_Settings', 'register']);
