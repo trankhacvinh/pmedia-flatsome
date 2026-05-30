@@ -11,6 +11,9 @@ final class PMFAI_Plugin
         if (!class_exists('PMFAI_Flatsome_UI_Skill_REST_Guard')) {
             require_once PMFAI_DIR . 'includes/class-flatsome-ui-skill-rest-guard.php';
         }
+        if (!class_exists('PMFAI_UI_Design_Quality')) {
+            require_once PMFAI_DIR . 'includes/class-ui-design-quality.php';
+        }
         if (!class_exists('PMFAI_UI_Quality_Gate')) {
             require_once PMFAI_DIR . 'includes/class-ui-quality-gate.php';
         }
