@@ -8,19 +8,25 @@ final class PMFAI_UI_Quality_Gate
 
     public static function check_page(array $page, string $context = 'page')
     {
-        $quality = PMFAI_Flatsome_UI_Skill::page_quality($page);
+        $quality = class_exists('PMFAI_UI_Design_Quality')
+            ? PMFAI_UI_Design_Quality::page_quality($page)
+            : PMFAI_Flatsome_UI_Skill::page_quality($page);
         return self::check_quality($quality, $context);
     }
 
     public static function check_shortcode(string $shortcode, string $context = 'shortcode')
     {
-        $quality = PMFAI_Flatsome_UI_Skill::score_block($shortcode, '');
+        $quality = class_exists('PMFAI_UI_Design_Quality')
+            ? PMFAI_UI_Design_Quality::score_block($shortcode, '', 'shortcode')
+            : PMFAI_Flatsome_UI_Skill::score_block($shortcode, '');
         return self::check_quality($quality, $context);
     }
 
     public static function check_block(string $html, string $css = '', string $context = 'block')
     {
-        $quality = PMFAI_Flatsome_UI_Skill::score_block($html, $css);
+        $quality = class_exists('PMFAI_UI_Design_Quality')
+            ? PMFAI_UI_Design_Quality::score_block($html, $css, 'block')
+            : PMFAI_Flatsome_UI_Skill::score_block($html, $css);
         return self::check_quality($quality, $context);
     }
 
