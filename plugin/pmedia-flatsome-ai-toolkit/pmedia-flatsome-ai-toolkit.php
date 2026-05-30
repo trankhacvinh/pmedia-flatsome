@@ -40,6 +40,7 @@ require_once PMFAI_DIR . 'includes/class-health-check.php';
 require_once PMFAI_DIR . 'includes/class-native-shortcode-sanitizer.php';
 require_once PMFAI_DIR . 'includes/class-design-system-ai.php';
 require_once PMFAI_DIR . 'includes/class-page-builder-ai.php';
+require_once PMFAI_DIR . 'includes/class-page-builder-premium-rest.php';
 require_once PMFAI_DIR . 'includes/class-page-section-regenerator.php';
 require_once PMFAI_DIR . 'includes/class-page-insert-box.php';
 require_once PMFAI_DIR . 'includes/class-ai-service.php';
