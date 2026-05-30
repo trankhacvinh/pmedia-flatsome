@@ -24,6 +24,7 @@ require_once PMFAI_DIR . 'includes/functions-compat.php';
 require_once PMFAI_DIR . 'includes/class-settings.php';
 require_once PMFAI_DIR . 'includes/class-post-types.php';
 require_once PMFAI_DIR . 'includes/class-section-patterns.php';
+require_once PMFAI_DIR . 'includes/class-beauty-presets.php';
 require_once PMFAI_DIR . 'includes/class-flatsome-ui-skill.php';
 require_once PMFAI_DIR . 'includes/class-prompt-builder.php';
 require_once PMFAI_DIR . 'includes/class-usage-logger.php';
