@@ -17,6 +17,18 @@ final class PMFAI_Beauty_Preset_REST
         ]);
     }
 
+    public static function register_assets(): void
+    {
+        add_action('admin_enqueue_scripts', [__CLASS__, 'admin_assets']);
+    }
+
+    public static function admin_assets($hook): void
+    {
+        $is_pmfai_screen = strpos((string)$hook, 'pmfai') !== false || strpos((string)$hook, 'pmedia-ai-builder') !== false;
+        if (!$is_pmfai_screen) { return; }
+        wp_enqueue_script('pmfai-beauty-preset-ui', PMFAI_URL . 'assets/js/beauty-preset-ui.js', ['pmfai-admin'], PMFAI_VERSION, true);
+    }
+
     public static function can_manage(): bool
     {
         return current_user_can('manage_options');
@@ -52,3 +64,5 @@ final class PMFAI_Beauty_Preset_REST
         return rest_ensure_response(['items' => $items, 'current' => PMFAI_Settings::get_options()['beauty_preset'] ?? 'corporate_blue']);
     }
 }
+
+add_action('plugins_loaded', ['PMFAI_Beauty_Preset_REST', 'register_assets'], 20);
