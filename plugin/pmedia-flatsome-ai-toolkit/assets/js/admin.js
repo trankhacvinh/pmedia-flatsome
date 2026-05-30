@@ -65,7 +65,7 @@ document.addEventListener('click', async function (e) {
 
   if (t.id === 'pmfai-page-bridge') {
     e.preventDefault();
-    const r = await pmfaiFetch('/page-builder/bridge-prompt', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), outputMode: val('pmfai-page-output-mode')});
+    const r = await pmfaiFetch('/page-builder/bridge-prompt', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), outputMode: val('pmfai-page-output-mode'), beautyPreset: val('pmfai-page-beauty-preset')});
     setVal('pmfai-page-prompt', r.prompt || '');
   }
 
@@ -73,7 +73,7 @@ document.addEventListener('click', async function (e) {
     e.preventDefault();
     pmfaiLastCreatedDraftId = null;
     await withLoading(t, 'Đang generate...', async () => {
-      const j = await pmfaiFetch('/page-builder/generate', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), costMode: val('pmfai-page-cost-mode'), outputMode: val('pmfai-page-output-mode')});
+      const j = await pmfaiFetch('/page-builder/generate', 'POST', {brief: val('pmfai-page-brief'), buildMode: val('pmfai-page-build-mode'), costMode: val('pmfai-page-cost-mode'), outputMode: val('pmfai-page-output-mode'), beautyPreset: val('pmfai-page-beauty-preset')});
       pmfaiLastPage = j.code ? null : j;
       setVal('pmfai-page-json', j.page ? JSON.stringify({version: j.version || '1.0', page: j.page}, null, 2) : (j.raw || ''));
       html('pmfai-page-result', renderPageResult(j));
@@ -114,7 +114,7 @@ document.addEventListener('click', async function (e) {
     e.preventDefault();
     await withLoading(t, 'Đang generate...', async () => {
       html('pmfai-generate-result', '<div class="notice notice-info"><p>Đang gọi AI API. Vui lòng không tắt trang.</p></div>');
-      const j = await pmfaiFetch('/generate-block', 'POST', {type: val('pmfai-generate-type'), costMode: val('pmfai-generate-cost-mode'), industry: val('pmfai-generate-industry'), style: val('pmfai-generate-style'), goal: val('pmfai-generate-goal'), content: val('pmfai-generate-content')});
+      const j = await pmfaiFetch('/generate-block', 'POST', {type: val('pmfai-generate-type'), costMode: val('pmfai-generate-cost-mode'), industry: val('pmfai-generate-industry'), style: val('pmfai-generate-style'), goal: val('pmfai-generate-goal'), content: val('pmfai-generate-content'), beautyPreset: val('pmfai-generate-beauty-preset')});
       pmfaiLastParsedBlock = j.code ? null : j;
       html('pmfai-generate-result', renderPmfaiResult(j, true, true));
       renderAllPreviewIframes();
@@ -123,7 +123,7 @@ document.addEventListener('click', async function (e) {
 
   if (t.id === 'pmfai-build-prompt') {
     e.preventDefault();
-    const r = await pmfaiFetch('/bridge-prompt', 'POST', {type: val('pmfai-bridge-type'), industry: val('pmfai-bridge-industry'), style: val('pmfai-bridge-style'), goal: val('pmfai-bridge-goal'), content: val('pmfai-bridge-content')});
+    const r = await pmfaiFetch('/bridge-prompt', 'POST', {type: val('pmfai-bridge-type'), industry: val('pmfai-bridge-industry'), style: val('pmfai-bridge-style'), goal: val('pmfai-bridge-goal'), content: val('pmfai-bridge-content'), beautyPreset: val('pmfai-bridge-beauty-preset')});
     setVal('pmfai-bridge-output', r.prompt || '');
   }
 
