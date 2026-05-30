@@ -34,6 +34,7 @@ require_once PMFAI_DIR . 'includes/providers/class-anthropic-provider.php';
 require_once PMFAI_DIR . 'includes/class-ai-provider-manager.php';
 require_once PMFAI_DIR . 'includes/class-ai-provider-tester.php';
 require_once PMFAI_DIR . 'includes/class-section-pattern-templates.php';
+require_once PMFAI_DIR . 'includes/class-page-builder-prompt.php';
 require_once PMFAI_DIR . 'includes/class-visual-quality-validator.php';
 require_once PMFAI_DIR . 'includes/class-health-check.php';
 require_once PMFAI_DIR . 'includes/class-native-shortcode-sanitizer.php';
