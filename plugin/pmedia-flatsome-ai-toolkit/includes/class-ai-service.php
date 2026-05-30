@@ -21,6 +21,7 @@ final class PMFAI_AI_Service
             'goal' => sanitize_text_field($params['goal'] ?? 'Tạo HTML Block copy vào Flatsome'),
             'content' => $content,
             'output_mode' => 'html-block',
+            'beauty_preset' => sanitize_key((string)($params['beautyPreset'] ?? $params['beauty_preset'] ?? ($options['beauty_preset'] ?? 'corporate_blue'))),
         ]);
 
         $response = PMFAI_AI_Provider_Manager::complete([
