@@ -12,6 +12,8 @@ final class PMFAI_Page_Builder_Prompt
         $recommended_ids = PMFAI_Section_Patterns::recommend_for_text($brief);
         $recommended = implode(', ', $recommended_ids);
         $templates = PMFAI_Section_Pattern_Templates::prompt_templates($recommended_ids);
+        $preset_id = sanitize_key((string)($params['beautyPreset'] ?? (PMFAI_Settings::get_options()['beauty_preset'] ?? 'corporate_blue')));
+        $beauty_prompt = PMFAI_Beauty_Presets::prompt($preset_id);
         $output_rule = $output_mode === 'flatsome-native'
             ? 'Output mode: Flatsome Native Shortcode. Chỉ dùng shortcode thật của Flatsome. Không dùng shortcode tự chế [pm-*].'
             : 'Output mode: Flatsome Section + HTML Block. Đây là mode an toàn và đẹp nhất.';
@@ -19,10 +21,12 @@ final class PMFAI_Page_Builder_Prompt
         return "Bạn là senior UI designer + senior UI engineer cho WordPress Flatsome.\n\n"
             . "Nhiệm vụ: tạo page plan và section theo brief. KHÔNG freestyle layout. Phải chọn pattern/template trước rồi mới điền nội dung.\n"
             . $output_rule . "\n\n"
+            . "Beauty Preset bắt buộc tuân theo:\n" . $beauty_prompt . "\n\n"
             . "Pattern Library được phép dùng:\n" . PMFAI_Section_Patterns::prompt_catalog() . "\n\n"
             . "Premium Pattern Templates bắt buộc tham khảo/dùng lại:\n" . $templates . "\n\n"
             . "Pattern được plugin gợi ý từ brief: {$recommended}\n\n"
             . "Visual design quality rules:\n"
+            . "- Toàn page phải thể hiện đúng Beauty Preset, không pha gu lung tung.\n"
             . "- Hero phải có impact: eyebrow, H1 mạnh, lead rõ, CTA chính/phụ, trust badges/proof và visual liên quan ngành.\n"
             . "- Service cards phải có icon, title ngắn, mô tả ngắn, depth/shadow/radius, rhythm đều.\n"
             . "- Process phải khác service, dùng timeline/số thứ tự, nội dung từng bước ngắn.\n"
@@ -52,7 +56,7 @@ final class PMFAI_Page_Builder_Prompt
             . "- Escape dấu nháy kép bên trong HTML/CSS/shortcode đúng một lần: dùng \\\" thay cho dấu nháy kép thô.\n"
             . "- Không double-escape HTML/CSS. Không trả về chuỗi có \\\\n hoặc \\\\\\\" còn hiện ra thành chữ trong preview.\n"
             . "- Nếu build mode là single-section thì chỉ tạo 1 section. Nếu full-page thì tạo đủ page hoàn chỉnh.\n\n"
-            . "Build mode: {$mode}\nOutput mode: {$output_mode}\nBrief:\n" . ($brief ?: '[Dán brief trang hoặc website tại đây]') . "\n\n"
+            . "Build mode: {$mode}\nOutput mode: {$output_mode}\nBeauty preset: {$preset_id}\nBrief:\n" . ($brief ?: '[Dán brief trang hoặc website tại đây]') . "\n\n"
             . "Schema bắt buộc:\n" . $schema_json;
     }
 
