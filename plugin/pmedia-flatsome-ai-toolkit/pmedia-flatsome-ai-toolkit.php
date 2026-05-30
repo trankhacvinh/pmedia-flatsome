@@ -54,3 +54,4 @@ require_once PMFAI_DIR . 'includes/class-plugin.php';
 
 register_activation_hook(__FILE__, ['PMFAI_Plugin', 'activate']);
 add_action('plugins_loaded', ['PMFAI_Plugin', 'init']);
+add_action('plugins_loaded', ['PMFAI_Page_Builder_Premium_REST', 'register'], 20);
