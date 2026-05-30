@@ -24,6 +24,7 @@ final class PMFAI_Prompt_Builder
             'goal' => 'Tạo giao diện section có thể copy vào Flatsome HTML Block.',
             'content' => '',
             'output_mode' => 'html-block',
+            'beauty_preset' => PMFAI_Settings::get_options()['beauty_preset'] ?? 'corporate_blue',
         ]);
 
         $tasks = [
@@ -36,12 +37,15 @@ final class PMFAI_Prompt_Builder
         ];
 
         $premium_templates = PMFAI_Section_Pattern_Templates::prompt_templates();
+        $beauty_prompt = PMFAI_Beauty_Presets::prompt(sanitize_key((string)$args['beauty_preset']));
 
         $prompt = "Bạn là senior UI designer và senior UI engineer cho WordPress Flatsome.\n\n"
             . "Bối cảnh: {$args['site']}\nNgành nghề: {$args['industry']}\nPhong cách: {$args['style']}\nMục tiêu: {$args['goal']}\n\n"
+            . "Beauty Preset bắt buộc tuân theo:\n" . $beauty_prompt . "\n\n"
             . "QUY TẮC QUAN TRỌNG: Không freestyle layout. Phải chọn một Premium Pattern Template phù hợp rồi điền nội dung vào template.\n\n"
             . "Premium Pattern Templates bắt buộc dùng/tham khảo:\n" . $premium_templates . "\n\n"
             . "Visual quality rules:\n"
+            . "- Toàn block/section phải thể hiện đúng Beauty Preset, không pha gu lung tung.\n"
             . "- Hero phải có eyebrow, H1 mạnh, lead rõ, CTA chính/phụ, trust badges/proof và visual liên quan ngành.\n"
             . "- Service cards phải có icon, title ngắn, mô tả ngắn, depth/shadow/radius và rhythm đều.\n"
             . "- Process phải khác service, dùng timeline/số thứ tự, mô tả từng bước ngắn.\n"
