@@ -22,17 +22,18 @@ final class PMFAI_Flatsome_UI_Skill_REST_Guard
     {
         if (isset($data['page']) && is_array($data['page'])) {
             $data['page'] = self::guard_page($data['page']);
-            $data['ui_skill_quality'] = PMFAI_Flatsome_UI_Skill::page_quality($data['page']);
+            $data['ui_skill_quality'] = self::page_quality($data['page']);
         }
         if (isset($data['section']) && is_array($data['section'])) {
             $data['section'] = self::guard_section($data['section'], self::mode($data));
         }
         if (isset($data['html']) || isset($data['css'])) {
             $data = PMFAI_Flatsome_UI_Skill::repair_block($data);
+            $data['quality'] = self::block_quality((string)($data['html'] ?? ''), (string)($data['css'] ?? ''), (string)($data['type'] ?? 'block'));
         }
         if (isset($data['shortcode']) && is_string($data['shortcode'])) {
             $data['shortcode'] = PMFAI_Flatsome_UI_Skill::repair_shortcode($data['shortcode'], self::mode($data));
-            $data['ui_skill_shortcode_quality'] = PMFAI_Flatsome_UI_Skill::score_block($data['shortcode'], '');
+            $data['ui_skill_shortcode_quality'] = self::block_quality($data['shortcode'], '', 'shortcode');
         }
         $data['ui_skill_guarded'] = true;
         return $data;
@@ -55,12 +56,23 @@ final class PMFAI_Flatsome_UI_Skill_REST_Guard
             $block = PMFAI_Flatsome_UI_Skill::repair_block(['html'=>(string)($section['html'] ?? ''),'css'=>(string)($section['css'] ?? ''),'warnings'=>[]]);
             $section['html'] = $block['html'];
             $section['css'] = $block['css'];
-            $section['ui_skill_quality'] = $block['quality'] ?? [];
+            $section['ui_skill_quality'] = self::block_quality((string)$section['html'], (string)$section['css'], (string)($section['type'] ?? 'section'));
         }
         if (!empty($section['shortcode'])) {
             $section['shortcode'] = PMFAI_Flatsome_UI_Skill::repair_shortcode((string)$section['shortcode'], $mode);
+            $section['ui_skill_quality'] = self::block_quality((string)$section['shortcode'], '', (string)($section['type'] ?? 'section'));
         }
         return $section;
+    }
+
+    private static function page_quality(array $page): array
+    {
+        return class_exists('PMFAI_UI_Design_Quality') ? PMFAI_UI_Design_Quality::page_quality($page) : PMFAI_Flatsome_UI_Skill::page_quality($page);
+    }
+
+    private static function block_quality(string $html, string $css = '', string $type = 'block'): array
+    {
+        return class_exists('PMFAI_UI_Design_Quality') ? PMFAI_UI_Design_Quality::score_block($html, $css, $type) : PMFAI_Flatsome_UI_Skill::score_block($html, $css);
     }
 
     private static function mode(array $data): string
