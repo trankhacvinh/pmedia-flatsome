@@ -15,3 +15,5 @@ final class PMFAI_Beauty_Preset_Assets
         wp_enqueue_script('pmfai-beauty-preset-ui', PMFAI_URL . 'assets/js/beauty-preset-ui.js', ['pmfai-admin'], PMFAI_VERSION, true);
     }
 }
+
+add_action('plugins_loaded', ['PMFAI_Beauty_Preset_Assets', 'register'], 20);
