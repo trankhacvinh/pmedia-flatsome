@@ -26,6 +26,7 @@ final class PMFAI_Settings
             'balanced_temperature' => '0.4',
             'high_model' => '',
             'high_temperature' => '0.65',
+            'beauty_preset' => 'corporate_blue',
             'primary_color' => '#e31e24',
             'secondary_color' => '#111827',
             'accent_color' => '#f59e0b',
@@ -66,6 +67,9 @@ final class PMFAI_Settings
             if ($key === 'ai_provider' || $key === 'fallback_provider') {
                 $provider = sanitize_key($value);
                 $output[$key] = in_array($provider, ['openai', 'openai_compatible', 'anthropic'], true) ? $provider : $default;
+            } elseif ($key === 'beauty_preset') {
+                $preset = sanitize_key($value);
+                $output[$key] = in_array($preset, ['corporate_blue','premium_dark','soft_saas','luxury_gold','education_friendly','medical_clean','tech_gradient','local_business'], true) ? $preset : $default;
             } elseif (strpos($key, 'color') !== false) {
                 $output[$key] = sanitize_hex_color($value) ?: $default;
             } elseif ($key === 'extra_rules') {
