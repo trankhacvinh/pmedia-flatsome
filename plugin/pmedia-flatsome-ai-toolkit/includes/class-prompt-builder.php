@@ -17,6 +17,10 @@ final class PMFAI_Prompt_Builder
 
     public static function build(string $type, array $args = []): string
     {
+        if (!empty($args['beautyPreset']) && empty($args['beauty_preset'])) {
+            $args['beauty_preset'] = $args['beautyPreset'];
+        }
+
         $args = wp_parse_args($args, [
             'site' => 'Website WordPress dùng theme Flatsome',
             'industry' => 'doanh nghiệp dịch vụ',
