@@ -20,7 +20,46 @@ final class PMFAI_Page_Builder_Premium_REST
             $params = $request->get_json_params() ?: [];
             return rest_ensure_response(self::generate($params));
         }
+        if ($route === '/pmedia-ai/v1/page-insert/bridge-prompt') {
+            return self::page_insert_bridge_prompt($request);
+        }
+        if ($route === '/pmedia-ai/v1/page-insert/generate') {
+            return self::page_insert_generate($request);
+        }
         return $result;
+    }
+
+    private static function page_insert_bridge_prompt(WP_REST_Request $request)
+    {
+        $params = $request->get_json_params() ?: [];
+        $post_id = absint($params['postId'] ?? 0);
+        $context = PMFAI_Page_Insert_Box::build_context($post_id);
+        $brief = trim((string)($params['brief'] ?? ''));
+        $params['buildMode'] = 'single-section';
+        $params['brief'] = "Trang hiện tại: " . ($context['title'] ?? '') . "\nSection count: " . ($context['section_count'] ?? 0) . "\nTóm tắt nội dung hiện tại: " . ($context['content_excerpt'] ?? '') . "\n\nYêu cầu thêm/sửa section:\n" . $brief;
+        return rest_ensure_response(['prompt' => PMFAI_Page_Builder_Prompt::build($params, PMFAI_Page_Builder_AI::schema()), 'context' => $context]);
+    }
+
+    private static function page_insert_generate(WP_REST_Request $request)
+    {
+        $params = $request->get_json_params() ?: [];
+        $post_id = absint($params['postId'] ?? 0);
+        if (!current_user_can('edit_post', $post_id)) {
+            return new WP_Error('forbidden', 'Bạn không có quyền sửa page này.', ['status' => 403]);
+        }
+        $context = PMFAI_Page_Insert_Box::build_context($post_id);
+        $brief = trim((string)($params['brief'] ?? ''));
+        $params['buildMode'] = 'single-section';
+        $params['brief'] = "Bạn đang hỗ trợ bổ sung section cho một page WordPress Flatsome hiện có.\n\nTrang hiện tại: " . ($context['title'] ?? '') . "\nSlug: " . ($context['slug'] ?? '') . "\nSố section hiện tại: " . ($context['section_count'] ?? 0) . "\nTóm tắt nội dung hiện tại: " . ($context['content_excerpt'] ?? '') . "\n\nYêu cầu section mới:\n" . $brief;
+        $generated = self::generate($params);
+        if (is_wp_error($generated)) { return $generated; }
+        $shortcode = (string)($generated['shortcode'] ?? '');
+        if (!empty($params['autoApply'])) {
+            $applied = PMFAI_Page_Insert_Box::apply_content($post_id, $shortcode, sanitize_key($params['action'] ?? 'append'));
+            if (is_wp_error($applied)) { return $applied; }
+            $generated['applied'] = $applied;
+        }
+        return rest_ensure_response($generated);
     }
 
     private static function generate(array $params)
